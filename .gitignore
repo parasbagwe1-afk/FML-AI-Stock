@@ -8,6 +8,6 @@ htmlcov/
 instance/
 *.sqlite
 *.db
-uploads/
-exports/
+/uploads/
+/exports/
 .DS_Store

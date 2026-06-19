@@ -4,9 +4,9 @@ from io import BytesIO, StringIO
 from flask import Response, send_file
 from openpyxl import Workbook
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import landscape, A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 
 def export_table(title, headers, rows, fmt):
@@ -42,7 +42,9 @@ def export_xlsx(filename, headers, rows):
         sheet.append(list(row))
     for column_cells in sheet.columns:
         length = max(len(str(cell.value or "")) for cell in column_cells)
-        sheet.column_dimensions[column_cells[0].column_letter].width = min(max(length + 2, 12), 42)
+        sheet.column_dimensions[column_cells[0].column_letter].width = min(
+            max(length + 2, 12), 42
+        )
     buffer = BytesIO()
     workbook.save(buffer)
     buffer.seek(0)
@@ -56,7 +58,14 @@ def export_xlsx(filename, headers, rows):
 
 def export_pdf(title, filename, headers, rows):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=18, leftMargin=18, topMargin=18, bottomMargin=18)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=18,
+        leftMargin=18,
+        topMargin=18,
+        bottomMargin=18,
+    )
     styles = getSampleStyleSheet()
     data = [headers] + [list(map(str, row)) for row in rows]
     table = Table(data, repeatRows=1)
@@ -68,10 +77,20 @@ def export_pdf(title, filename, headers, rows):
                 ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#E5E7EB")),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                 ("FONTSIZE", (0, 0), (-1, -1), 7),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+                (
+                    "ROWBACKGROUNDS",
+                    (0, 1),
+                    (-1, -1),
+                    [colors.white, colors.HexColor("#F8FAFC")],
+                ),
             ]
         )
     )
     doc.build([Paragraph(title, styles["Title"]), Spacer(1, 12), table])
     buffer.seek(0)
-    return send_file(buffer, mimetype="application/pdf", as_attachment=True, download_name=f"{filename}.pdf")
+    return send_file(
+        buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"{filename}.pdf",
+    )

@@ -1,0 +1,14 @@
+.git
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.coverage
+htmlcov
+.env
+instance
+*.sqlite
+*.db
+uploads
+exports
+.DS_Store

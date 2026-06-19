@@ -6,7 +6,6 @@ from flask_login import login_required
 
 from app.core.formatting import fmt_money, fmt_qty, money, qty
 from app.core.security import require_permission
-from app.exports.reporting import export_table
 from app.extensions import db
 from app.models import (
     AuditLog,
@@ -25,6 +24,7 @@ from app.models import (
     StockBook,
     StockLedgerEntry,
 )
+from app.reports.exporting import export_table
 
 bp = Blueprint("reports", __name__, url_prefix="/reports")
 

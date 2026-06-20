@@ -9,7 +9,7 @@
         <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}">{{ company.code }} - {{ company.name }}</option>{% endfor %}</select>
       </label>
       <label>Stock book
-        <select name="stock_book_id" required>{% for book in stock_books %}<option value="{{ book.id }}">{{ book.code }} - {{ book.name }}</option>{% endfor %}</select>
+        <select name="stock_book_id" required>{% for book in stock_books %}<option value="{{ book.id }}" data-company-id="{{ book.company_id }}" data-book-type="{{ book.book_type }}">{{ book.code }} - {{ book.name }}</option>{% endfor %}</select>
       </label>
       <label>Customer
         <select name="customer_id" required>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.code }} - {{ customer.name }}</option>{% endfor %}</select>
@@ -31,8 +31,27 @@
   <section class="panel">
     <div class="panel-title"><h2>Recent Sales</h2><a href="{{ url_for('reports.show', name='sales') }}">Report</a></div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Date</th><th>Company</th><th>Customer</th><th>Invoice</th><th>Total</th><th>FIFO cost</th><th>Status</th></tr></thead>
-      <tbody>{% for row in sales %}<tr><td>{{ row.invoice_date }}</td><td>{{ row.company.code }}</td><td>{{ row.customer.name }}</td><td>{{ row.invoice_number }}</td><td>{{ fmt_money(row.grand_total) }}</td><td>{{ fmt_money(row.fifo_cost) }}</td><td>{{ row.payment_status }}</td></tr>{% else %}<tr><td colspan="7" class="empty">No sales yet.</td></tr>{% endfor %}</tbody>
+      <thead><tr><th>Date</th><th>Company</th><th>Customer</th><th>Invoice</th><th>Total</th><th>FIFO cost</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for row in sales %}
+          <tr>
+            <td>{{ row.invoice_date }}</td>
+            <td>{{ row.company.code }}</td>
+            <td>{{ row.customer.name }}</td>
+            <td>{{ row.invoice_number }}</td>
+            <td>{{ fmt_money(row.grand_total) }}</td>
+            <td>{{ fmt_money(row.fifo_cost) }}</td>
+            <td>{{ row.payment_status }}</td>
+            <td class="actions">
+              {% if can(current_user, 'sale', 'edit') or can(current_user, 'sale', 'create') %}
+                <a class="table-action" href="{{ url_for('transactions.sale_edit', sale_id=row.id) }}">Edit</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="8" class="empty">No sales yet.</td></tr>
+        {% endfor %}
+      </tbody>
     </table></div>
   </section>
 {% endblock %}

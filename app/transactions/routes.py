@@ -1,12 +1,13 @@
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.core.forms import item_lines_from_form, transfer_lines_from_form
-from app.core.security import require_permission
+from app.core.security import can, require_permission
 from app.extensions import db
 from app.models import (
     Company,
     Customer,
+    InterCompanyTransfer,
     Item,
     Payable,
     Payment,
@@ -28,6 +29,8 @@ from app.services.transactions import (
     create_sale,
     create_transfer,
     update_purchase_header,
+    update_sale_header,
+    update_transfer_header,
 )
 
 bp = Blueprint("transactions", __name__, url_prefix="/transactions")
@@ -70,8 +73,9 @@ def purchase():
 
 @bp.route("/purchase/<int:purchase_id>/edit", methods=["GET", "POST"])
 @login_required
-@require_permission("purchase", "edit")
 def purchase_edit(purchase_id):
+    if not (can(current_user, "purchase", "edit") or can(current_user, "purchase", "create")):
+        abort(403)
     purchase = db.session.get(Purchase, purchase_id)
     if not purchase:
         flash("Purchase not found.", "danger")
@@ -106,6 +110,27 @@ def sale():
     return render_template("transactions/sale.html", sales=sales, **options())
 
 
+@bp.route("/sale/<int:sale_id>/edit", methods=["GET", "POST"])
+@login_required
+def sale_edit(sale_id):
+    if not (can(current_user, "sale", "edit") or can(current_user, "sale", "create")):
+        abort(403)
+    sale = db.session.get(Sale, sale_id)
+    if not sale:
+        flash("Sale not found.", "danger")
+        return redirect(url_for("transactions.sale"))
+    if request.method == "POST":
+        try:
+            update_sale_header(sale, request.form, current_user)
+            db.session.commit()
+            flash(f"Sale {sale.invoice_number} updated.", "success")
+            return redirect(url_for("transactions.sale"))
+        except Exception as exc:
+            db.session.rollback()
+            flash(str(exc), "danger")
+    return render_template("transactions/sale_edit.html", sale=sale, **options())
+
+
 @bp.route("/transfer", methods=["GET", "POST"])
 @login_required
 @require_permission("transfer", "view")
@@ -120,10 +145,29 @@ def transfer():
         except Exception as exc:
             db.session.rollback()
             flash(str(exc), "danger")
-    from app.models import InterCompanyTransfer
-
     transfers = InterCompanyTransfer.query.order_by(InterCompanyTransfer.transfer_date.desc(), InterCompanyTransfer.id.desc()).limit(20).all()
     return render_template("transactions/transfer.html", transfers=transfers, **options())
+
+
+@bp.route("/transfer/<int:transfer_id>/edit", methods=["GET", "POST"])
+@login_required
+def transfer_edit(transfer_id):
+    if not (can(current_user, "transfer", "edit") or can(current_user, "transfer", "create")):
+        abort(403)
+    transfer = db.session.get(InterCompanyTransfer, transfer_id)
+    if not transfer:
+        flash("Transfer not found.", "danger")
+        return redirect(url_for("transactions.transfer"))
+    if request.method == "POST":
+        try:
+            update_transfer_header(transfer, request.form, current_user)
+            db.session.commit()
+            flash(f"Transfer {transfer.reference_number} updated.", "success")
+            return redirect(url_for("transactions.transfer"))
+        except Exception as exc:
+            db.session.rollback()
+            flash(str(exc), "danger")
+    return render_template("transactions/transfer_edit.html", transfer=transfer, **options())
 
 
 @bp.route("/opening", methods=["GET"])

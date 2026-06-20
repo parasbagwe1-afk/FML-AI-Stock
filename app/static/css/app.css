@@ -262,6 +262,15 @@ textarea { min-height: 84px; resize: vertical; }
 .ghost-button { background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid rgba(255,255,255,0.14); }
 .icon-button { background: #F2F4F7; color: var(--navy); border: 1px solid #D0D5DD; padding: 9px 10px; }
 .link-button { background: transparent; color: var(--danger); padding: 0; }
+.table-action {
+  display: inline-block;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid #D0D5DD;
+  background: #fff;
+  color: var(--navy);
+  font-weight: 800;
+}
 .full { width: 100%; }
 .flash-stack {
   display: grid;

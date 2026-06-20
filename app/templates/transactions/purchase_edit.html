@@ -6,13 +6,24 @@
     <form method="post" class="form-grid wide">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label>Company
-        <input value="{{ purchase.company.code }} - {{ purchase.company.name }}" disabled>
+        <select name="company_id" required>
+          {% for company in companies %}
+            <option value="{{ company.id }}" {% if company.id == purchase.company_id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>
+          {% endfor %}
+        </select>
       </label>
       <label>Stock book
-        <input value="{{ purchase.stock_book.code }} - {{ purchase.stock_book.name }}" disabled>
+        <select name="stock_book_id" required>
+          {% for book in stock_books %}
+            <option value="{{ book.id }}" data-company-id="{{ book.company_id }}" data-book-type="{{ book.book_type }}" {% if book.id == purchase.stock_book_id %}selected{% endif %}>{{ book.code }} - {{ book.name }}</option>
+          {% endfor %}
+        </select>
       </label>
       <label>Purchase type
-        <input value="{{ purchase.purchase_type }}" disabled>
+        <select name="purchase_type" required>
+          <option value="GST" {% if purchase.purchase_type == 'GST' %}selected{% endif %}>GST</option>
+          <option value="CASH" {% if purchase.purchase_type == 'CASH' %}selected{% endif %}>CASH</option>
+        </select>
       </label>
       <label>Supplier
         <select name="supplier_id" required>
@@ -31,10 +42,17 @@
         <input name="due_date" type="date" value="{{ purchase.due_date or '' }}">
       </label>
       <label>Total
-        <input value="{{ fmt_money(purchase.grand_total) }}" disabled>
+        <input name="grand_total" type="number" step="0.01" min="0" value="{{ purchase.grand_total }}" required>
       </label>
       <label>Status
-        <input value="{{ purchase.payment_status }}" disabled>
+        <select name="payment_status" required>
+          {% for status in ['UNPAID', 'PARTIAL', 'PAID'] %}
+            <option value="{{ status }}" {% if purchase.payment_status == status %}selected{% endif %}>{{ status }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Paid amount
+        <input name="paid_amount" type="number" step="0.01" min="0" value="{{ purchase.paid_amount or 0 }}">
       </label>
       <label class="full-span">Remarks
         <textarea name="remarks">{{ purchase.remarks or '' }}</textarea>

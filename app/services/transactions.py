@@ -229,6 +229,12 @@ def create_purchase(data, lines, user):
 
 
 def update_purchase_header(purchase, data, user):
+    company_id = data.get("company_id") or purchase.company_id
+    stock_book_id = data.get("stock_book_id") or purchase.stock_book_id
+    purchase_type = data.get("purchase_type") or purchase.purchase_type
+    company, stock_book = validate_company_book(
+        company_id, stock_book_id, purchase_type, "purchase"
+    )
     supplier = active_supplier(data.get("supplier_id"))
     bill_number = data.get("bill_number", "").strip()
     if not bill_number:
@@ -239,39 +245,106 @@ def update_purchase_header(purchase, data, user):
         if data.get("due_date")
         else default_due(bill_date, supplier.default_credit_days)
     )
+    grand_total = positive_money(data.get("grand_total") or purchase.grand_total, "Total")
+    payment_state = (data.get("payment_status") or purchase.payment_status or "UNPAID").upper()
+    if payment_state not in {"UNPAID", "PARTIAL", "PAID"}:
+        raise ValueError("Invalid payment status.")
+    if payment_state == "PAID":
+        paid_amount = grand_total
+    elif payment_state == "UNPAID":
+        paid_amount = Decimal("0.00")
+    else:
+        paid_amount = money(data.get("paid_amount") or purchase.paid_amount or "0")
+        if paid_amount <= Decimal("0.00") or paid_amount >= grand_total:
+            raise ValueError("Partial status requires a paid amount greater than zero and less than total.")
+    balance_amount = money(grand_total - paid_amount)
+
+    duplicate = Purchase.query.filter(
+        Purchase.id != purchase.id,
+        Purchase.company_id == company.id,
+        Purchase.supplier_id == supplier.id,
+        Purchase.bill_number == bill_number,
+    ).first()
+    if duplicate:
+        raise ValueError("Purchase bill number already exists for this company and supplier.")
+
+    category_changed = (
+        purchase.company_id != company.id
+        or purchase.stock_book_id != stock_book.id
+        or purchase.purchase_type != purchase_type
+    )
+    if category_changed:
+        consumed_layers = FIFOLayer.query.filter(
+            FIFOLayer.source_type == "PURCHASE",
+            FIFOLayer.source_id == purchase.id,
+            FIFOLayer.available_quantity != FIFOLayer.original_quantity,
+        ).count()
+        if consumed_layers:
+            raise ValueError("Company, stock book, or purchase type cannot be changed after this stock has been consumed.")
 
     before = {
+        "company_id": purchase.company_id,
+        "stock_book_id": purchase.stock_book_id,
+        "purchase_type": purchase.purchase_type,
         "supplier_id": purchase.supplier_id,
         "bill_number": purchase.bill_number,
         "bill_date": purchase.bill_date,
         "due_date": purchase.due_date,
+        "grand_total": purchase.grand_total,
+        "paid_amount": purchase.paid_amount,
+        "balance_amount": purchase.balance_amount,
+        "payment_status": purchase.payment_status,
         "remarks": purchase.remarks,
     }
 
+    purchase.company_id = company.id
+    purchase.stock_book_id = stock_book.id
+    purchase.purchase_type = purchase_type
     purchase.supplier_id = supplier.id
     purchase.bill_number = bill_number
     purchase.bill_date = bill_date
     purchase.due_date = due_date
+    purchase.grand_total = grand_total
+    purchase.paid_amount = paid_amount
+    purchase.balance_amount = balance_amount
+    purchase.payment_status = payment_state
     purchase.remarks = data.get("remarks") or None
     purchase.updated_by_id = getattr(user, "id", None)
 
     payable = Payable.query.filter_by(source_type="PURCHASE", source_id=purchase.id).first()
     if payable:
+        payable.company_id = company.id
+        payable.stock_book_id = stock_book.id
         payable.supplier_id = supplier.id
         payable.document_number = bill_number
         payable.document_date = bill_date
         payable.due_date = due_date
+        payable.transaction_type = purchase_type
+        payable.total_amount = grand_total
+        payable.paid_amount = paid_amount
+        payable.balance_amount = balance_amount
+        payable.payment_status = payment_state
         payable.remarks = purchase.remarks
         payable.updated_by_id = getattr(user, "id", None)
 
     FIFOLayer.query.filter_by(source_type="PURCHASE", source_id=purchase.id).update(
-        {"source_reference": bill_number, "source_date": bill_date},
+        {
+            "company_id": company.id,
+            "stock_book_id": stock_book.id,
+            "source_reference": bill_number,
+            "source_date": bill_date,
+        },
         synchronize_session=False,
     )
     StockLedgerEntry.query.filter_by(
         transaction_type="PURCHASE", transaction_id=purchase.id
     ).update(
-        {"reference_number": bill_number, "entry_date": bill_date},
+        {
+            "company_id": company.id,
+            "stock_book_id": stock_book.id,
+            "reference_number": bill_number,
+            "entry_date": bill_date,
+        },
         synchronize_session=False,
     )
 
@@ -282,10 +355,17 @@ def update_purchase_header(purchase, data, user):
         bill_number,
         before=before,
         after={
+            "company_id": purchase.company_id,
+            "stock_book_id": purchase.stock_book_id,
+            "purchase_type": purchase.purchase_type,
             "supplier_id": purchase.supplier_id,
             "bill_number": purchase.bill_number,
             "bill_date": purchase.bill_date,
             "due_date": purchase.due_date,
+            "grand_total": purchase.grand_total,
+            "paid_amount": purchase.paid_amount,
+            "balance_amount": purchase.balance_amount,
+            "payment_status": purchase.payment_status,
             "remarks": purchase.remarks,
         },
         user=user,
@@ -393,6 +473,69 @@ def create_sale(data, lines, user):
         )
     )
     audit("create", "Sale", sale.id, invoice_number, user=user)
+    return sale
+
+
+def update_sale_header(sale, data, user):
+    customer = active_customer(data.get("customer_id"))
+    invoice_number = data.get("invoice_number", "").strip()
+    if not invoice_number:
+        raise ValueError("Invoice number is required.")
+    invoice_date = parse_date(data.get("invoice_date"), "Invoice date")
+    due_date = (
+        parse_date(data["due_date"], "Due date")
+        if data.get("due_date")
+        else default_due(invoice_date, customer.default_credit_days)
+    )
+    if sale.paid_amount and sale.customer_id != customer.id:
+        raise ValueError("Customer cannot be changed after receipt allocation.")
+
+    before = {
+        "customer_id": sale.customer_id,
+        "invoice_number": sale.invoice_number,
+        "invoice_date": sale.invoice_date,
+        "due_date": sale.due_date,
+        "remarks": sale.remarks,
+    }
+
+    sale.customer_id = customer.id
+    sale.invoice_number = invoice_number
+    sale.invoice_date = invoice_date
+    sale.due_date = due_date
+    sale.remarks = data.get("remarks") or None
+    sale.updated_by_id = getattr(user, "id", None)
+
+    receivable = Receivable.query.filter_by(source_type="SALE", source_id=sale.id).first()
+    if receivable:
+        receivable.customer_id = customer.id
+        receivable.document_number = invoice_number
+        receivable.document_date = invoice_date
+        receivable.due_date = due_date
+        receivable.remarks = sale.remarks
+        receivable.updated_by_id = getattr(user, "id", None)
+
+    StockLedgerEntry.query.filter_by(
+        transaction_type="SALE", transaction_id=sale.id
+    ).update(
+        {"reference_number": invoice_number, "entry_date": invoice_date},
+        synchronize_session=False,
+    )
+
+    audit(
+        "edit",
+        "Sale",
+        sale.id,
+        invoice_number,
+        before=before,
+        after={
+            "customer_id": sale.customer_id,
+            "invoice_number": sale.invoice_number,
+            "invoice_date": sale.invoice_date,
+            "due_date": sale.due_date,
+            "remarks": sale.remarks,
+        },
+        user=user,
+    )
     return sale
 
 
@@ -547,6 +690,75 @@ def create_transfer(data, lines, user):
         "InterCompanyTransfer",
         transfer.id,
         reference,
+        approval_reason=transfer.approval_reason,
+        user=user,
+    )
+    return transfer
+
+
+def update_transfer_header(transfer, data, user):
+    reference = data.get("reference_number", "").strip()
+    if not reference:
+        raise ValueError("Transfer reference number is required.")
+    transfer_date = parse_date(data.get("transfer_date"), "Transfer date")
+    mismatch_approved = bool(data.get("mismatch_approved"))
+
+    before = {
+        "reference_number": transfer.reference_number,
+        "transfer_date": transfer.transfer_date,
+        "reason": transfer.reason,
+        "remarks": transfer.remarks,
+        "mismatch_approved": transfer.mismatch_approved,
+        "approval_reason": transfer.approval_reason,
+    }
+
+    transfer.reference_number = reference
+    transfer.transfer_date = transfer_date
+    transfer.reason = data.get("reason") or None
+    transfer.remarks = data.get("remarks") or None
+    transfer.mismatch_approved = mismatch_approved
+    transfer.approval_reason = data.get("approval_reason") or None
+    if mismatch_approved and not transfer.approved_by_id:
+        transfer.approved_by_id = getattr(user, "id", None)
+        transfer.approved_at = datetime.utcnow()
+    if not mismatch_approved:
+        transfer.approved_by_id = None
+        transfer.approved_at = None
+    transfer.updated_by_id = getattr(user, "id", None)
+
+    StockLedgerEntry.query.filter_by(
+        transaction_type="TRANSFER", transaction_id=transfer.id
+    ).update(
+        {"reference_number": reference, "entry_date": transfer_date},
+        synchronize_session=False,
+    )
+    FIFOLayer.query.filter_by(source_type="TRANSFER_IN", source_id=transfer.id).update(
+        {"source_reference": reference, "source_date": transfer_date},
+        synchronize_session=False,
+    )
+    Payable.query.filter_by(source_type="INTER_COMPANY", source_id=transfer.id).update(
+        {"document_number": reference, "document_date": transfer_date},
+        synchronize_session=False,
+    )
+    Receivable.query.filter_by(source_type="INTER_COMPANY", source_id=transfer.id).update(
+        {"document_number": reference, "document_date": transfer_date},
+        synchronize_session=False,
+    )
+
+    audit(
+        "edit",
+        "InterCompanyTransfer",
+        transfer.id,
+        reference,
+        before=before,
+        after={
+            "reference_number": transfer.reference_number,
+            "transfer_date": transfer.transfer_date,
+            "reason": transfer.reason,
+            "remarks": transfer.remarks,
+            "mismatch_approved": transfer.mismatch_approved,
+            "approval_reason": transfer.approval_reason,
+        },
         approval_reason=transfer.approval_reason,
         user=user,
     )

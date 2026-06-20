@@ -51,3 +51,42 @@ document.addEventListener("submit", (event) => {
     event.preventDefault();
   }
 });
+
+function filterStockBooks(form) {
+  const company = form.querySelector('select[name="company_id"]');
+  const category =
+    form.querySelector('select[name="purchase_type"]') ||
+    form.querySelector('select[name="sale_type"]');
+  const stockBook = form.querySelector('select[name="stock_book_id"]');
+  if (!company || !category || !stockBook) return;
+
+  const companyId = company.value;
+  const bookType = category.value;
+  let selectedStillVisible = false;
+
+  stockBook.querySelectorAll("option").forEach((option) => {
+    const visible =
+      !option.dataset.companyId ||
+      (option.dataset.companyId === companyId && option.dataset.bookType === bookType);
+    option.hidden = !visible;
+    option.disabled = !visible;
+    if (visible && option.selected) selectedStillVisible = true;
+  });
+
+  if (!selectedStillVisible) {
+    const firstVisible = Array.from(stockBook.options).find((option) => !option.disabled);
+    if (firstVisible) firstVisible.selected = true;
+  }
+}
+
+document.addEventListener("change", (event) => {
+  if (
+    event.target.matches('select[name="company_id"]') ||
+    event.target.matches('select[name="purchase_type"]') ||
+    event.target.matches('select[name="sale_type"]')
+  ) {
+    filterStockBooks(event.target.closest("form"));
+  }
+});
+
+document.querySelectorAll("form").forEach(filterStockBooks);

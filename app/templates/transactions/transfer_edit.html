@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block page_title %}Edit Transfer{% endblock %}
+{% block page_subtitle %}Update transfer reference details while preserving source/destination stock movement and FIFO value.{% endblock %}
+{% block content %}
+  <section class="panel">
+    <form method="post" class="form-grid wide">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>From company
+        <input value="{{ transfer.from_company.code }} - {{ transfer.from_company.name }}" disabled>
+      </label>
+      <label>From stock book
+        <input value="{{ transfer.from_stock_book.code }} - {{ transfer.from_stock_book.name }}" disabled>
+      </label>
+      <label>To company
+        <input value="{{ transfer.to_company.code }} - {{ transfer.to_company.name }}" disabled>
+      </label>
+      <label>To stock book
+        <input value="{{ transfer.to_stock_book.code }} - {{ transfer.to_stock_book.name }}" disabled>
+      </label>
+      <label>Reference
+        <input name="reference_number" value="{{ transfer.reference_number }}" required>
+      </label>
+      <label>Transfer date
+        <input name="transfer_date" type="date" value="{{ transfer.transfer_date }}" required>
+      </label>
+      <label>Reason
+        <input name="reason" value="{{ transfer.reason or '' }}">
+      </label>
+      <label>Total FIFO value
+        <input value="{{ fmt_money(transfer.total_fifo_value) }}" disabled>
+      </label>
+      <label class="check full-span">
+        <input name="mismatch_approved" value="1" type="checkbox" {% if transfer.mismatch_approved %}checked{% endif %}>
+        Approve GST/cash mismatch
+      </label>
+      <label class="full-span">Approval reason
+        <textarea name="approval_reason">{{ transfer.approval_reason or '' }}</textarea>
+      </label>
+      <label class="full-span">Remarks
+        <textarea name="remarks">{{ transfer.remarks or '' }}</textarea>
+      </label>
+      <div class="full-span table-wrap">
+        <table>
+          <thead><tr><th>Item</th><th>Quantity</th><th>FIFO value</th></tr></thead>
+          <tbody>
+            {% for line in transfer.lines %}
+              <tr>
+                <td>{{ line.item.display_name }}</td>
+                <td>{{ fmt_qty(line.quantity) }}</td>
+                <td>{{ fmt_money(line.fifo_value) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="form-actions full-span">
+        <a class="secondary-button" href="{{ url_for('transactions.transfer') }}">Cancel</a>
+        <button class="primary-button" type="submit">Save Changes</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}

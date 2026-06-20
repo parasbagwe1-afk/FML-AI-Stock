@@ -5,12 +5,13 @@
     <form class="login-card" method="post">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="login-brand">
-        <span class="brand-mark large">FA</span>
+        <span class="brand-mark large logo-mark"><img src="{{ url_for('static', filename='img/fastockflow-icon.png', v=asset_version) }}" alt="FAstockFlow"></span>
         <div>
           <h1>FAstockFlow</h1>
           <p>Stock & Ledger System</p>
         </div>
       </div>
+      <img class="login-wordmark" src="{{ url_for('static', filename='img/fastockflow-wordmark.png', v=asset_version) }}" alt="FAstockFlow">
       <label>Email or login ID
         <input name="email" type="email" autocomplete="username" required autofocus>
       </label>

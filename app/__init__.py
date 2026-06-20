@@ -1,6 +1,8 @@
+from datetime import date, timedelta
 from pathlib import Path
 
 from flask import Flask, render_template, request
+from flask_login import current_user
 
 from app.config import Config
 from app.extensions import csrf, db, login_manager
@@ -41,6 +43,7 @@ def create_app(config_object=None):
 def register_template_helpers(app):
     from app.core.formatting import fmt_money, fmt_qty
     from app.core.security import can
+    from app.models import Payable, Receivable
 
     @app.context_processor
     def inject_helpers():
@@ -53,11 +56,28 @@ def register_template_helpers(app):
                     return False
             return True
 
+        def due_alert_count():
+            if not current_user.is_authenticated or not can(current_user, "due_alerts", "view"):
+                return None
+            today = date.today()
+            upcoming = today + timedelta(days=7)
+            receivables = Receivable.query.filter(
+                Receivable.balance_amount > 0,
+                Receivable.due_date <= upcoming,
+            ).count()
+            payables = Payable.query.filter(
+                Payable.balance_amount > 0,
+                Payable.due_date <= upcoming,
+            ).count()
+            return receivables + payables
+
         return {
             "can": can,
             "fmt_money": fmt_money,
             "fmt_qty": fmt_qty,
             "is_active_nav": is_active_nav,
+            "due_alert_count": due_alert_count(),
+            "asset_version": app.config.get("STATIC_ASSET_VERSION", "1"),
         }
 
 

@@ -6,16 +6,16 @@
     <form method="post" class="form-grid wide">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label>From company
-        <select name="from_company_id" required>{% for company in companies %}<option value="{{ company.id }}">{{ company.code }} - {{ company.name }}</option>{% endfor %}</select>
+        <select name="from_company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if company.code == 'FML' %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select>
       </label>
       <label>From stock book
-        <select name="from_stock_book_id" required>{% for book in stock_books %}<option value="{{ book.id }}">{{ book.code }} - {{ book.name }}</option>{% endfor %}</select>
+        <select name="from_stock_book_id" required>{% for book in stock_books %}<option value="{{ book.id }}" data-company-id="{{ book.company_id }}" data-book-type="{{ book.book_type }}" {% if book.code == 'FML_GST' %}selected{% endif %}>{{ book.code }} - {{ book.name }}</option>{% endfor %}</select>
       </label>
       <label>To company
-        <select name="to_company_id" required>{% for company in companies %}<option value="{{ company.id }}">{{ company.code }} - {{ company.name }}</option>{% endfor %}</select>
+        <select name="to_company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if company.code == 'AI' %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select>
       </label>
       <label>To stock book
-        <select name="to_stock_book_id" required>{% for book in stock_books %}<option value="{{ book.id }}">{{ book.code }} - {{ book.name }}</option>{% endfor %}</select>
+        <select name="to_stock_book_id" required>{% for book in stock_books %}<option value="{{ book.id }}" data-company-id="{{ book.company_id }}" data-book-type="{{ book.book_type }}" {% if book.code == 'AI_GST' %}selected{% endif %}>{{ book.code }} - {{ book.name }}</option>{% endfor %}</select>
       </label>
       <label>Reference
         <span class="input-action"><input id="transfer_ref" name="reference_number" required><button type="button" data-auto-ref="transfer" data-target="#transfer_ref">Auto</button></span>
@@ -28,6 +28,27 @@
       <div class="full-span">{% include "transactions/_transfer_lines.html" %}</div>
       <div class="form-actions full-span"><button class="primary-button" type="submit">Save Transfer</button></div>
     </form>
+  </section>
+  <section class="panel">
+    <div class="panel-title"><h2>Pending Balance</h2><a href="{{ url_for('reports.show', name='inter-company') }}">Report</a></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Owner</th><th>User</th><th>Item</th><th>Opening pending</th><th>Issued</th><th>Returned</th><th>Pending</th></tr></thead>
+      <tbody>
+        {% for row in pending_rows %}
+          <tr>
+            <td>{{ row.owner.code }}</td>
+            <td>{{ row.user.code }}</td>
+            <td>{{ row.item.display_name }}</td>
+            <td>{{ fmt_qty(row.opening) }}</td>
+            <td>{{ fmt_qty(row.issued) }}</td>
+            <td>{{ fmt_qty(row.returned) }}</td>
+            <td>{{ fmt_qty(row.pending) }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="empty">No pending stock.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
   </section>
   <section class="panel">
     <div class="panel-title"><h2>Recent Transfers</h2><a href="{{ url_for('reports.show', name='inter-company') }}">Report</a></div>
@@ -45,6 +66,12 @@
             <td class="actions">
               {% if can(current_user, 'transfer', 'edit') or can(current_user, 'transfer', 'create') %}
                 <a class="table-action" href="{{ url_for('transactions.transfer_edit', transfer_id=row.id) }}">Edit</a>
+              {% endif %}
+              {% if can(current_user, 'transfer', 'edit') or can(current_user, 'transfer', 'deactivate') %}
+                <form method="post" action="{{ url_for('transactions.transfer_delete', transfer_id=row.id) }}" data-confirm="Delete this transfer and reverse its stock movement?">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="link-button" type="submit">Delete</button>
+                </form>
               {% endif %}
             </td>
           </tr>

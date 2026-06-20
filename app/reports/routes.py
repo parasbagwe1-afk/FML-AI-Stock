@@ -11,8 +11,6 @@ from app.models import (
     AuditLog,
     Company,
     FIFOLayer,
-    InterCompanyLedgerEntry,
-    InterCompanyTransfer,
     Item,
     Payable,
     Payment,
@@ -25,6 +23,7 @@ from app.models import (
     StockLedgerEntry,
 )
 from app.reports.exporting import export_table
+from app.services.transactions import pending_transfer_summary
 
 bp = Blueprint("reports", __name__, url_prefix="/reports")
 
@@ -179,7 +178,7 @@ def stock_ledger_rows():
 def purchase_rows():
     headers = ["Date", "Company", "Book", "Supplier", "Bill", "Type", "Subtotal", "GST", "Grand total", "Paid", "Balance", "Status"]
     rows = []
-    for purchase in Purchase.query.order_by(Purchase.bill_date.desc(), Purchase.id.desc()).all():
+    for purchase in Purchase.query.filter_by(is_void=False).order_by(Purchase.bill_date.desc(), Purchase.id.desc()).all():
         rows.append([
             purchase.bill_date,
             purchase.company.code,
@@ -200,7 +199,7 @@ def purchase_rows():
 def sales_rows():
     headers = ["Date", "Company", "Book", "Customer", "Invoice", "Type", "Subtotal", "GST", "Grand total", "FIFO cost", "Gross profit", "Balance", "Status"]
     rows = []
-    for sale in Sale.query.order_by(Sale.invoice_date.desc(), Sale.id.desc()).all():
+    for sale in Sale.query.filter_by(is_void=False).order_by(Sale.invoice_date.desc(), Sale.id.desc()).all():
         rows.append([
             sale.invoice_date,
             sale.company.code,
@@ -234,6 +233,7 @@ def sales_by_type_rows():
         )
         .join(Company, Sale.company_id == Company.id)
         .join(StockBook, Sale.stock_book_id == StockBook.id)
+        .filter(Sale.is_void.is_(False))
         .group_by(Company.code, StockBook.book_type)
     )
     for row in query:
@@ -244,7 +244,7 @@ def sales_by_type_rows():
 def gross_profit_rows():
     headers = ["Invoice", "Date", "Company", "Customer", "Item", "Sale value ex GST", "FIFO cost", "Gross profit", "Margin %"]
     rows = []
-    for line in SaleLine.query.join(Sale).order_by(Sale.invoice_date.desc()).all():
+    for line in SaleLine.query.join(Sale).filter(Sale.is_void.is_(False)).order_by(Sale.invoice_date.desc()).all():
         margin = Decimal("0.00")
         if line.subtotal:
             margin = money((line.gross_profit / line.subtotal) * Decimal("100"))
@@ -334,10 +334,18 @@ def stock_alert_rows():
 
 
 def inter_company_rows():
-    headers = ["Transfer", "Date", "Owner", "User", "Item", "Quantity", "Amount owed", "Settled", "Balance", "Status"]
+    headers = ["Owner", "User", "Item", "Opening Pending", "Issued This Month", "Returned This Month", "Pending Balance"]
     rows = []
-    for entry in InterCompanyLedgerEntry.query.join(InterCompanyTransfer).order_by(InterCompanyTransfer.transfer_date.desc()).all():
-        rows.append([entry.transfer.reference_number, entry.transfer.transfer_date, entry.owner_company.code, entry.user_company.code, entry.item.display_name if entry.item else "", fmt_qty(entry.quantity), fmt_money(entry.amount_owed), fmt_money(entry.settled_amount), fmt_money(entry.balance_amount), entry.status])
+    for entry in pending_transfer_summary():
+        rows.append([
+            entry["owner"].code,
+            entry["user"].code,
+            entry["item"].display_name,
+            fmt_qty(entry["opening"]),
+            fmt_qty(entry["issued"]),
+            fmt_qty(entry["returned"]),
+            fmt_qty(entry["pending"]),
+        ])
     return headers, rows
 
 
@@ -360,7 +368,7 @@ def purchase_price_rows():
     headers = ["Item", "Supplier", "Previous rate", "Latest rate", "Change", "Change %", "Previous date", "Latest date"]
     rows = []
     grouped = {}
-    for line in PurchaseLine.query.join(Purchase).order_by(Purchase.bill_date.desc(), PurchaseLine.id.desc()).all():
+    for line in PurchaseLine.query.join(Purchase).filter(Purchase.is_void.is_(False)).order_by(Purchase.bill_date.desc(), PurchaseLine.id.desc()).all():
         key = (line.item_id, line.purchase.supplier_id)
         grouped.setdefault(key, []).append(line)
     for entries in grouped.values():

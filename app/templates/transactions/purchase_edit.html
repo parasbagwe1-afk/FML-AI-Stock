@@ -41,8 +41,8 @@
       <label>Due date
         <input name="due_date" type="date" value="{{ purchase.due_date or '' }}">
       </label>
-      <label>Total
-        <input name="grand_total" type="number" step="0.01" min="0" value="{{ purchase.grand_total }}" required>
+      <label>Current total
+        <input value="{{ fmt_money(purchase.grand_total) }}" disabled>
       </label>
       <label>Status
         <select name="payment_status" required>
@@ -57,21 +57,24 @@
       <label class="full-span">Remarks
         <textarea name="remarks">{{ purchase.remarks or '' }}</textarea>
       </label>
-      <div class="full-span table-wrap">
-        <table>
-          <thead><tr><th>Item</th><th>Quantity</th><th>Rate</th><th>GST %</th><th>Total</th></tr></thead>
-          <tbody>
-            {% for line in purchase.lines %}
-              <tr>
-                <td>{{ line.item.display_name }}</td>
-                <td>{{ fmt_qty(line.quantity) }}</td>
-                <td>{{ line.rate }}</td>
-                <td>{{ line.gst_percent }}</td>
-                <td>{{ fmt_money(line.line_total) }}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="full-span">
+        <div class="line-grid edit-lines" data-line-grid>
+          <div class="line-grid-head">
+            <span>Item</span><span>Quantity</span><span>Rate</span><span>GST %</span><span>Total</span><span></span>
+          </div>
+          {% for line in purchase.lines %}
+            <div class="line-row">
+              <input type="hidden" name="line_id[]" value="{{ line.id }}">
+              <input type="hidden" name="item_id[]" value="{{ line.item_id }}">
+              <input value="{{ line.item.display_name }}" disabled>
+              <input name="quantity[]" type="number" step="0.001" min="0" value="{{ line.quantity }}" required>
+              <input name="rate[]" type="number" step="0.0001" min="0" value="{{ line.rate }}" required>
+              <input name="gst_percent[]" type="number" step="0.01" min="0" value="{{ line.gst_percent }}">
+              <output class="line-total-preview">{{ fmt_money(line.line_total) }}</output>
+              <span></span>
+            </div>
+          {% endfor %}
+        </div>
       </div>
       <div class="form-actions full-span">
         <a class="secondary-button" href="{{ url_for('transactions.purchase') }}">Cancel</a>

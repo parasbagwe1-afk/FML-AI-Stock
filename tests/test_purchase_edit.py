@@ -1,6 +1,10 @@
 from app.extensions import db
+import pytest
+from decimal import Decimal
+
 from app.models import FIFOLayer, Payable, Purchase, StockLedgerEntry, User
-from app.services.transactions import create_purchase, update_purchase_header
+from app.services.stock import available_quantity
+from app.services.transactions import create_purchase, create_sale, update_purchase_header, update_purchase_lines
 from tests.test_fifo_workflows import admin, ids
 
 
@@ -93,6 +97,95 @@ def test_purchase_edit_can_change_total_and_status_to_paid(app):
         assert payable.paid_amount == 250
         assert payable.balance_amount == 0
         assert payable.payment_status == "PAID"
+
+
+def test_purchase_edit_updates_item_quantity_rate_and_stock(app):
+    with app.app_context():
+        data = ids()
+        purchase = create_purchase(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "supplier_id": data["supplier"].id,
+                "purchase_type": "GST",
+                "bill_number": "LINE-BILL",
+                "bill_date": "2026-06-01",
+            },
+            [{"item_id": data["item"].id, "quantity": "2", "rate": "100", "gst_percent": "18"}],
+            admin(),
+        )
+        db.session.flush()
+        line = purchase.lines[0]
+
+        update_purchase_header(
+            purchase,
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "purchase_type": "GST",
+                "supplier_id": data["supplier"].id,
+                "bill_number": "LINE-BILL",
+                "bill_date": "2026-06-01",
+                "payment_status": "UNPAID",
+            },
+            admin(),
+        )
+        update_purchase_lines(
+            purchase,
+            [{"line_id": line.id, "item_id": data["item"].id, "quantity": "3", "rate": "125", "gst_percent": "18"}],
+            {"payment_status": "UNPAID"},
+            admin(),
+        )
+        db.session.commit()
+
+        layer = FIFOLayer.query.filter_by(source_type="PURCHASE", source_id=purchase.id).one()
+        ledger = StockLedgerEntry.query.filter_by(transaction_type="PURCHASE", transaction_id=purchase.id).one()
+        assert purchase.grand_total == Decimal("442.50")
+        assert layer.original_quantity == 3
+        assert layer.available_quantity == 3
+        assert layer.unit_cost == 125
+        assert ledger.quantity_in == 3
+        assert ledger.rate == 125
+        assert available_quantity(data["ai"].id, data["ai_gst"].id, data["item"].id) == 3
+
+
+def test_purchase_edit_rejects_line_change_after_stock_consumed(app):
+    with app.app_context():
+        data = ids()
+        purchase = create_purchase(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "supplier_id": data["supplier"].id,
+                "purchase_type": "GST",
+                "bill_number": "CONSUMED-BILL",
+                "bill_date": "2026-06-01",
+            },
+            [{"item_id": data["item"].id, "quantity": "2", "rate": "100", "gst_percent": "18"}],
+            admin(),
+        )
+        create_sale(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "customer_id": data["customer"].id,
+                "sale_type": "GST",
+                "invoice_number": "CONSUME-INV",
+                "invoice_date": "2026-06-02",
+            },
+            [{"item_id": data["item"].id, "quantity": "1", "rate": "150", "gst_percent": "18"}],
+            admin(),
+        )
+        db.session.flush()
+        line = purchase.lines[0]
+
+        with pytest.raises(ValueError):
+            update_purchase_lines(
+                purchase,
+                [{"line_id": line.id, "item_id": data["item"].id, "quantity": "3", "rate": "100", "gst_percent": "18"}],
+                {"payment_status": "UNPAID"},
+                admin(),
+            )
 
 
 def test_purchase_edit_page_renders(client, app):

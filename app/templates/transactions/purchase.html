@@ -45,6 +45,12 @@
               {% if can(current_user, 'purchase', 'edit') or can(current_user, 'purchase', 'create') %}
                 <a class="table-action" href="{{ url_for('transactions.purchase_edit', purchase_id=row.id) }}">Edit</a>
               {% endif %}
+              {% if can(current_user, 'purchase', 'edit') or can(current_user, 'purchase', 'deactivate') %}
+                <form method="post" action="{{ url_for('transactions.purchase_delete', purchase_id=row.id) }}" data-confirm="Delete this purchase and reverse its stock?">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="link-button" type="submit">Delete</button>
+                </form>
+              {% endif %}
             </td>
           </tr>
         {% else %}

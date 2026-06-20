@@ -9,13 +9,13 @@ from app.extensions import db
 from app.models import (
     Company,
     FIFOLayer,
-    InterCompanyLedgerEntry,
     Item,
     Payable,
     Receivable,
     Sale,
     StockBook,
 )
+from app.services.transactions import pending_transfer_summary
 
 bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
@@ -71,7 +71,10 @@ def index():
             ) or Decimal("0")
             if quantity <= item.minimum_stock:
                 low_stock.append({"item": item, "book": book, "quantity": quantity})
-    inter_company_balance = db.session.query(db.func.coalesce(db.func.sum(InterCompanyLedgerEntry.balance_amount), 0)).filter(InterCompanyLedgerEntry.balance_amount > 0).scalar()
+    inter_company_pending = sum(
+        (row["pending"] for row in pending_transfer_summary(today)),
+        Decimal("0.000"),
+    )
     return render_template(
         "dashboard/index.html",
         stock_cards=stock_cards,
@@ -83,5 +86,5 @@ def index():
         upcoming_count=upcoming_count,
         low_stock=low_stock[:8],
         low_stock_count=len(low_stock),
-        inter_company_balance=inter_company_balance,
+        inter_company_pending=inter_company_pending,
     )

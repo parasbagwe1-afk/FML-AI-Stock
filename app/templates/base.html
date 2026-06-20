@@ -4,14 +4,15 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}FAstockFlow{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='img/fastockflow-icon.png', v=asset_version) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=asset_version) }}">
   </head>
   <body>
     {% if current_user.is_authenticated %}
       <div class="app-shell">
         <aside class="sidebar">
           <a class="brand" href="{{ url_for('dashboard.index') }}">
-            <span class="brand-mark">FA</span>
+            <span class="brand-mark logo-mark"><img src="{{ url_for('static', filename='img/fastockflow-icon.png', v=asset_version) }}" alt="FAstockFlow"></span>
             <span>
               <strong>FAstockFlow</strong>
               <small>Stock & Ledger System</small>
@@ -29,7 +30,6 @@
               ('transactions.opening','opening','Opening'),
               ('payments.index','payments','Payments'),
               ('payments.outstanding','outstanding','Outstanding'),
-              ('reports.show','due_alerts','Due Alerts', {'name':'due-alerts'}),
               ('reports.show','stock','Stock', {'name':'current-stock'}),
               ('reports.show','inter_company','Inter Co', {'name':'inter-company'}),
               ('reports.index','reports','Reports'),
@@ -60,7 +60,18 @@
               <h1>{% block page_title %}FAstockFlow{% endblock %}</h1>
               <p>{% block page_subtitle %}Real-time stock, FIFO, payments and inter-company control{% endblock %}</p>
             </div>
-            <div class="user-chip">{{ current_user.name }} · {{ current_user.role }}</div>
+            <div class="topbar-actions">
+              {% if due_alert_count is not none %}
+                <a class="bell-button" href="{{ url_for('reports.show', name='due-alerts') }}" title="Due alerts" aria-label="Due alerts">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+                    <path d="M13.7 21a2 2 0 0 1-3.4 0"></path>
+                  </svg>
+                  {% if due_alert_count > 0 %}<span class="alert-badge">{{ due_alert_count }}</span>{% endif %}
+                </a>
+              {% endif %}
+              <div class="user-chip">{{ current_user.name }} · {{ current_user.role }}</div>
+            </div>
           </header>
           {% include "macros/flashes.html" %}
           {% block content %}{% endblock %}
@@ -70,6 +81,6 @@
       {% include "macros/flashes.html" %}
       {% block public_content %}{% endblock %}
     {% endif %}
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js', v=asset_version) }}"></script>
   </body>
 </html>

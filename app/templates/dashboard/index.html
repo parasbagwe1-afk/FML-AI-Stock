@@ -3,9 +3,12 @@
 {% block page_subtitle %}Stock, outstanding, alerts, and inter-company control at a glance.{% endblock %}
 {% block content %}
   <section class="hero-panel">
-    <div>
-      <h2>FAstockFlow</h2>
-      <p>Real-time stock, FIFO, payments and inter-company control</p>
+    <div class="hero-brand">
+      <span class="hero-logo"><img src="{{ url_for('static', filename='img/fastockflow-icon.png', v=asset_version) }}" alt="FAstockFlow"></span>
+      <div>
+        <h2>FAstockFlow</h2>
+        <p>Real-time stock, FIFO, payments and inter-company control</p>
+      </div>
     </div>
     <a class="secondary-button" href="{{ url_for('dashboard.index') }}">Refresh</a>
   </section>
@@ -33,9 +36,9 @@
     </article>
     <article class="metric-card">
       <span>Inter-company</span>
-      <h3>Open balance</h3>
-      <strong>{{ fmt_money(inter_company_balance) }}</strong>
-      <small>FIFO-valued stock usage</small>
+      <h3>Pending stock</h3>
+      <strong>{{ fmt_qty(inter_company_pending) }}</strong>
+      <small>Issued minus returned quantity</small>
     </article>
     <article class="metric-card danger">
       <span>Stock alerts</span>

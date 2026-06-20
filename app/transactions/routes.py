@@ -9,6 +9,7 @@ from app.models import (
     Customer,
     InterCompanyTransfer,
     Item,
+    OpeningStock,
     Payable,
     Payment,
     PaymentMode,
@@ -23,14 +24,22 @@ from app.services.transactions import (
     create_opening_advance_paid,
     create_opening_advance_received,
     create_opening_payable,
+    create_opening_pending_stock,
     create_opening_receivable,
     create_opening_stock,
     create_purchase,
     create_sale,
     create_transfer,
+    pending_transfer_summary,
     update_purchase_header,
+    update_purchase_lines,
     update_sale_header,
+    update_sale_lines,
     update_transfer_header,
+    void_opening_stock,
+    void_purchase,
+    void_sale,
+    void_transfer,
 )
 
 bp = Blueprint("transactions", __name__, url_prefix="/transactions")
@@ -67,7 +76,7 @@ def purchase():
         except Exception as exc:
             db.session.rollback()
             flash(str(exc), "danger")
-    purchases = Purchase.query.order_by(Purchase.bill_date.desc(), Purchase.id.desc()).limit(20).all()
+    purchases = Purchase.query.filter_by(is_void=False).order_by(Purchase.bill_date.desc(), Purchase.id.desc()).limit(20).all()
     return render_template("transactions/purchase.html", purchases=purchases, **options())
 
 
@@ -83,6 +92,7 @@ def purchase_edit(purchase_id):
     if request.method == "POST":
         try:
             update_purchase_header(purchase, request.form, current_user)
+            update_purchase_lines(purchase, item_lines_from_form(request.form), request.form, current_user)
             db.session.commit()
             flash(f"Purchase {purchase.bill_number} updated.", "success")
             return redirect(url_for("transactions.purchase"))
@@ -90,6 +100,25 @@ def purchase_edit(purchase_id):
             db.session.rollback()
             flash(str(exc), "danger")
     return render_template("transactions/purchase_edit.html", purchase=purchase, **options())
+
+
+@bp.route("/purchase/<int:purchase_id>/delete", methods=["POST"])
+@login_required
+def purchase_delete(purchase_id):
+    if not (can(current_user, "purchase", "edit") or can(current_user, "purchase", "deactivate")):
+        abort(403)
+    purchase = db.session.get(Purchase, purchase_id)
+    if not purchase:
+        flash("Purchase not found.", "danger")
+        return redirect(url_for("transactions.purchase"))
+    try:
+        void_purchase(purchase, current_user)
+        db.session.commit()
+        flash("Purchase deleted and stock reversed.", "success")
+    except Exception as exc:
+        db.session.rollback()
+        flash(str(exc), "danger")
+    return redirect(url_for("transactions.purchase"))
 
 
 @bp.route("/sale", methods=["GET", "POST"])
@@ -106,7 +135,7 @@ def sale():
         except Exception as exc:
             db.session.rollback()
             flash(str(exc), "danger")
-    sales = Sale.query.order_by(Sale.invoice_date.desc(), Sale.id.desc()).limit(20).all()
+    sales = Sale.query.filter_by(is_void=False).order_by(Sale.invoice_date.desc(), Sale.id.desc()).limit(20).all()
     return render_template("transactions/sale.html", sales=sales, **options())
 
 
@@ -122,6 +151,7 @@ def sale_edit(sale_id):
     if request.method == "POST":
         try:
             update_sale_header(sale, request.form, current_user)
+            update_sale_lines(sale, item_lines_from_form(request.form), current_user)
             db.session.commit()
             flash(f"Sale {sale.invoice_number} updated.", "success")
             return redirect(url_for("transactions.sale"))
@@ -129,6 +159,25 @@ def sale_edit(sale_id):
             db.session.rollback()
             flash(str(exc), "danger")
     return render_template("transactions/sale_edit.html", sale=sale, **options())
+
+
+@bp.route("/sale/<int:sale_id>/delete", methods=["POST"])
+@login_required
+def sale_delete(sale_id):
+    if not (can(current_user, "sale", "edit") or can(current_user, "sale", "deactivate")):
+        abort(403)
+    sale = db.session.get(Sale, sale_id)
+    if not sale:
+        flash("Sale not found.", "danger")
+        return redirect(url_for("transactions.sale"))
+    try:
+        void_sale(sale, current_user)
+        db.session.commit()
+        flash("Sale deleted and stock restored.", "success")
+    except Exception as exc:
+        db.session.rollback()
+        flash(str(exc), "danger")
+    return redirect(url_for("transactions.sale"))
 
 
 @bp.route("/transfer", methods=["GET", "POST"])
@@ -145,8 +194,13 @@ def transfer():
         except Exception as exc:
             db.session.rollback()
             flash(str(exc), "danger")
-    transfers = InterCompanyTransfer.query.order_by(InterCompanyTransfer.transfer_date.desc(), InterCompanyTransfer.id.desc()).limit(20).all()
-    return render_template("transactions/transfer.html", transfers=transfers, **options())
+    transfers = InterCompanyTransfer.query.filter_by(is_void=False).order_by(InterCompanyTransfer.transfer_date.desc(), InterCompanyTransfer.id.desc()).limit(20).all()
+    return render_template(
+        "transactions/transfer.html",
+        transfers=transfers,
+        pending_rows=pending_transfer_summary(),
+        **options(),
+    )
 
 
 @bp.route("/transfer/<int:transfer_id>/edit", methods=["GET", "POST"])
@@ -170,13 +224,32 @@ def transfer_edit(transfer_id):
     return render_template("transactions/transfer_edit.html", transfer=transfer, **options())
 
 
+@bp.route("/transfer/<int:transfer_id>/delete", methods=["POST"])
+@login_required
+def transfer_delete(transfer_id):
+    if not (can(current_user, "transfer", "edit") or can(current_user, "transfer", "deactivate")):
+        abort(403)
+    transfer = db.session.get(InterCompanyTransfer, transfer_id)
+    if not transfer:
+        flash("Transfer not found.", "danger")
+        return redirect(url_for("transactions.transfer"))
+    try:
+        void_transfer(transfer, current_user)
+        db.session.commit()
+        flash("Transfer deleted and stock movement reversed.", "success")
+    except Exception as exc:
+        db.session.rollback()
+        flash(str(exc), "danger")
+    return redirect(url_for("transactions.transfer"))
+
+
 @bp.route("/opening", methods=["GET"])
 @login_required
 @require_permission("opening", "view")
 def opening():
     return render_template(
         "transactions/opening.html",
-        opening_stock=[],
+        opening_stock=OpeningStock.query.filter_by(is_void=False).order_by(OpeningStock.opening_date.desc()).limit(20).all(),
         receivables=Receivable.query.filter_by(is_opening=True).order_by(Receivable.document_date.desc()).limit(20).all(),
         payables=Payable.query.filter_by(is_opening=True).order_by(Payable.document_date.desc()).limit(20).all(),
         advances=Payment.query.filter(Payment.payment_type.like("OPENING_ADVANCE%")).order_by(Payment.payment_date.desc()).limit(20).all(),
@@ -195,6 +268,9 @@ def opening_save(section):
         elif section == "receivable":
             record = create_opening_receivable(request.form, current_user)
             message = f"Opening receivable {record.document_number} saved."
+        elif section == "pending-stock":
+            record = create_opening_pending_stock(request.form, item_lines_from_form(request.form), current_user)
+            message = f"Opening pending stock {record.reference_number} saved."
         elif section == "payable":
             record = create_opening_payable(request.form, current_user)
             message = f"Opening payable {record.document_number} saved."
@@ -209,6 +285,25 @@ def opening_save(section):
             return redirect(url_for("transactions.opening"))
         db.session.commit()
         flash(message, "success")
+    except Exception as exc:
+        db.session.rollback()
+        flash(str(exc), "danger")
+    return redirect(url_for("transactions.opening"))
+
+
+@bp.route("/opening/stock/<int:opening_id>/delete", methods=["POST"])
+@login_required
+def opening_stock_delete(opening_id):
+    if not (can(current_user, "opening", "create") or can(current_user, "opening", "deactivate")):
+        abort(403)
+    opening = db.session.get(OpeningStock, opening_id)
+    if not opening:
+        flash("Opening stock not found.", "danger")
+        return redirect(url_for("transactions.opening"))
+    try:
+        void_opening_stock(opening, current_user)
+        db.session.commit()
+        flash("Opening stock deleted and stock reversed.", "success")
     except Exception as exc:
         db.session.rollback()
         flash(str(exc), "danger")

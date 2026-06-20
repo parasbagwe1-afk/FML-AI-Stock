@@ -1,10 +1,16 @@
 import pytest
 
 from app.extensions import db
-from app.models import Company, Customer, Item, Payable, Receivable, StockBook, Supplier, User
-from app.services.payments import create_customer_receipt
+from app.models import Company, Customer, Item, StockBook, Supplier, User
 from app.services.stock import available_quantity
-from app.services.transactions import create_opening_stock, create_purchase, create_sale, create_transfer
+from app.services.transactions import (
+    create_opening_stock,
+    create_purchase,
+    create_sale,
+    create_transfer,
+    pending_transfer_quantity,
+    void_transfer,
+)
 
 
 def admin():
@@ -79,13 +85,13 @@ def test_fifo_sale_and_negative_stock_rejection(app):
             )
 
 
-def test_transfer_preserves_fifo_value_and_payment_allocation(app):
+def test_transfer_issue_return_and_pending_balance(app):
     with app.app_context():
         data = ids()
         create_opening_stock(
             {
-                "company_id": data["ai"].id,
-                "stock_book_id": data["ai_gst"].id,
+                "company_id": data["fml"].id,
+                "stock_book_id": data["fml_gst"].id,
                 "reference_number": "OPN-2",
                 "opening_date": "2026-01-01",
             },
@@ -94,10 +100,10 @@ def test_transfer_preserves_fifo_value_and_payment_allocation(app):
         )
         transfer = create_transfer(
             {
-                "from_company_id": data["ai"].id,
-                "from_stock_book_id": data["ai_gst"].id,
-                "to_company_id": data["fml"].id,
-                "to_stock_book_id": data["fml_gst"].id,
+                "from_company_id": data["fml"].id,
+                "from_stock_book_id": data["fml_gst"].id,
+                "to_company_id": data["ai"].id,
+                "to_stock_book_id": data["ai_gst"].id,
                 "reference_number": "TRF-1",
                 "transfer_date": "2026-01-05",
             },
@@ -106,34 +112,90 @@ def test_transfer_preserves_fifo_value_and_payment_allocation(app):
         )
         db.session.commit()
         assert transfer.total_fifo_value == 240
-        assert available_quantity(data["fml"].id, data["fml_gst"].id, data["item"].id) == 2
-        assert Payable.query.filter_by(source_type="INTER_COMPANY").first().balance_amount == 240
+        assert available_quantity(data["fml"].id, data["fml_gst"].id, data["item"].id) == 3
+        assert available_quantity(data["ai"].id, data["ai_gst"].id, data["item"].id) == 0
+        assert pending_transfer_quantity(data["fml"].id, data["ai"].id, data["item"].id) == 2
 
-        sale = create_sale(
+        returned = create_transfer(
+            {
+                "from_company_id": data["ai"].id,
+                "from_stock_book_id": data["ai_gst"].id,
+                "to_company_id": data["fml"].id,
+                "to_stock_book_id": data["fml_gst"].id,
+                "reference_number": "TRF-RET-1",
+                "invoice_date": "2026-01-06",
+                "transfer_date": "2026-01-06",
+            },
+            [{"item_id": data["item"].id, "quantity": "1"}],
+            admin(),
+        )
+        db.session.commit()
+        assert returned.total_fifo_value == 120
+        assert available_quantity(data["fml"].id, data["fml_gst"].id, data["item"].id) == 4
+        assert pending_transfer_quantity(data["fml"].id, data["ai"].id, data["item"].id) == 1
+
+        with pytest.raises(ValueError):
+            create_transfer(
+                {
+                    "from_company_id": data["ai"].id,
+                    "from_stock_book_id": data["ai_gst"].id,
+                    "to_company_id": data["fml"].id,
+                    "to_stock_book_id": data["fml_gst"].id,
+                    "reference_number": "TRF-RET-OVER",
+                    "transfer_date": "2026-01-07",
+                },
+                [{"item_id": data["item"].id, "quantity": "2"}],
+                admin(),
+            )
+
+
+def test_transfer_return_delete_reverses_warehouse_and_pending(app):
+    with app.app_context():
+        data = ids()
+        create_opening_stock(
             {
                 "company_id": data["fml"].id,
                 "stock_book_id": data["fml_gst"].id,
-                "customer_id": data["customer"].id,
-                "sale_type": "GST",
-                "invoice_number": "FML-INV-1",
-                "invoice_date": "2026-01-06",
+                "reference_number": "OPN-RETURN-DELETE",
+                "opening_date": "2026-01-01",
             },
-            [{"item_id": data["item"].id, "quantity": "1", "rate": "200", "gst_percent": "18"}],
+            [{"item_id": data["item"].id, "quantity": "5", "rate": "120"}],
             admin(),
         )
-        db.session.commit()
-        receivable = Receivable.query.filter_by(source_type="SALE", source_id=sale.id).first()
-        payment = create_customer_receipt(
+        issue = create_transfer(
             {
-                "company_id": data["fml"].id,
-                "customer_id": data["customer"].id,
-                "receivable_id": receivable.id,
-                "payment_date": "2026-01-07",
-                "mode": "CASH",
-                "amount": "236",
+                "from_company_id": data["fml"].id,
+                "from_stock_book_id": data["fml_gst"].id,
+                "to_company_id": data["ai"].id,
+                "to_stock_book_id": data["ai_gst"].id,
+                "reference_number": "TRF-DELETE-ISSUE",
+                "transfer_date": "2026-01-05",
             },
+            [{"item_id": data["item"].id, "quantity": "2"}],
             admin(),
         )
+        returned = create_transfer(
+            {
+                "from_company_id": data["ai"].id,
+                "from_stock_book_id": data["ai_gst"].id,
+                "to_company_id": data["fml"].id,
+                "to_stock_book_id": data["fml_gst"].id,
+                "reference_number": "TRF-DELETE-RETURN",
+                "transfer_date": "2026-01-06",
+            },
+            [{"item_id": data["item"].id, "quantity": "1"}],
+            admin(),
+        )
+        db.session.flush()
+        assert available_quantity(data["fml"].id, data["fml_gst"].id, data["item"].id) == 4
+        assert pending_transfer_quantity(data["fml"].id, data["ai"].id, data["item"].id) == 1
+
+        with pytest.raises(ValueError):
+            void_transfer(issue, admin())
+
+        void_transfer(returned, admin())
         db.session.commit()
-        assert payment.unallocated_amount == 0
-        assert receivable.payment_status == "PAID"
+
+        assert returned.is_void is True
+        assert available_quantity(data["fml"].id, data["fml_gst"].id, data["item"].id) == 3
+        assert pending_transfer_quantity(data["fml"].id, data["ai"].id, data["item"].id) == 2

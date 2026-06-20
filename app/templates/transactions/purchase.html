@@ -31,8 +31,26 @@
   <section class="panel">
     <div class="panel-title"><h2>Recent Purchases</h2><a href="{{ url_for('reports.show', name='purchases') }}">Report</a></div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Date</th><th>Company</th><th>Supplier</th><th>Bill</th><th>Total</th><th>Status</th></tr></thead>
-      <tbody>{% for row in purchases %}<tr><td>{{ row.bill_date }}</td><td>{{ row.company.code }}</td><td>{{ row.supplier.name }}</td><td>{{ row.bill_number }}</td><td>{{ fmt_money(row.grand_total) }}</td><td>{{ row.payment_status }}</td></tr>{% else %}<tr><td colspan="6" class="empty">No purchases yet.</td></tr>{% endfor %}</tbody>
+      <thead><tr><th>Date</th><th>Company</th><th>Supplier</th><th>Bill</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for row in purchases %}
+          <tr>
+            <td>{{ row.bill_date }}</td>
+            <td>{{ row.company.code }}</td>
+            <td>{{ row.supplier.name }}</td>
+            <td>{{ row.bill_number }}</td>
+            <td>{{ fmt_money(row.grand_total) }}</td>
+            <td>{{ row.payment_status }}</td>
+            <td class="actions">
+              {% if can(current_user, 'purchase', 'edit') %}
+                <a href="{{ url_for('transactions.purchase_edit', purchase_id=row.id) }}">Edit</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="empty">No purchases yet.</td></tr>
+        {% endfor %}
+      </tbody>
     </table></div>
   </section>
 {% endblock %}

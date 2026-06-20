@@ -27,6 +27,7 @@ from app.services.transactions import (
     create_purchase,
     create_sale,
     create_transfer,
+    update_purchase_header,
 )
 
 bp = Blueprint("transactions", __name__, url_prefix="/transactions")
@@ -65,6 +66,26 @@ def purchase():
             flash(str(exc), "danger")
     purchases = Purchase.query.order_by(Purchase.bill_date.desc(), Purchase.id.desc()).limit(20).all()
     return render_template("transactions/purchase.html", purchases=purchases, **options())
+
+
+@bp.route("/purchase/<int:purchase_id>/edit", methods=["GET", "POST"])
+@login_required
+@require_permission("purchase", "edit")
+def purchase_edit(purchase_id):
+    purchase = db.session.get(Purchase, purchase_id)
+    if not purchase:
+        flash("Purchase not found.", "danger")
+        return redirect(url_for("transactions.purchase"))
+    if request.method == "POST":
+        try:
+            update_purchase_header(purchase, request.form, current_user)
+            db.session.commit()
+            flash(f"Purchase {purchase.bill_number} updated.", "success")
+            return redirect(url_for("transactions.purchase"))
+        except Exception as exc:
+            db.session.rollback()
+            flash(str(exc), "danger")
+    return render_template("transactions/purchase_edit.html", purchase=purchase, **options())
 
 
 @bp.route("/sale", methods=["GET", "POST"])

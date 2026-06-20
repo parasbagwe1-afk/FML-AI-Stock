@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block page_title %}Edit Purchase{% endblock %}
+{% block page_subtitle %}Update purchase header details while preserving stock, FIFO quantities, totals, and payment status.{% endblock %}
+{% block content %}
+  <section class="panel">
+    <form method="post" class="form-grid wide">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Company
+        <input value="{{ purchase.company.code }} - {{ purchase.company.name }}" disabled>
+      </label>
+      <label>Stock book
+        <input value="{{ purchase.stock_book.code }} - {{ purchase.stock_book.name }}" disabled>
+      </label>
+      <label>Purchase type
+        <input value="{{ purchase.purchase_type }}" disabled>
+      </label>
+      <label>Supplier
+        <select name="supplier_id" required>
+          {% for supplier in suppliers %}
+            <option value="{{ supplier.id }}" {% if supplier.id == purchase.supplier_id %}selected{% endif %}>{{ supplier.code }} - {{ supplier.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Bill number
+        <input name="bill_number" value="{{ purchase.bill_number }}" required>
+      </label>
+      <label>Bill date
+        <input name="bill_date" type="date" value="{{ purchase.bill_date }}" required>
+      </label>
+      <label>Due date
+        <input name="due_date" type="date" value="{{ purchase.due_date or '' }}">
+      </label>
+      <label>Total
+        <input value="{{ fmt_money(purchase.grand_total) }}" disabled>
+      </label>
+      <label>Status
+        <input value="{{ purchase.payment_status }}" disabled>
+      </label>
+      <label class="full-span">Remarks
+        <textarea name="remarks">{{ purchase.remarks or '' }}</textarea>
+      </label>
+      <div class="full-span table-wrap">
+        <table>
+          <thead><tr><th>Item</th><th>Quantity</th><th>Rate</th><th>GST %</th><th>Total</th></tr></thead>
+          <tbody>
+            {% for line in purchase.lines %}
+              <tr>
+                <td>{{ line.item.display_name }}</td>
+                <td>{{ fmt_qty(line.quantity) }}</td>
+                <td>{{ line.rate }}</td>
+                <td>{{ line.gst_percent }}</td>
+                <td>{{ fmt_money(line.line_total) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="form-actions full-span">
+        <a class="secondary-button" href="{{ url_for('transactions.purchase') }}">Cancel</a>
+        <button class="primary-button" type="submit">Save Changes</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}

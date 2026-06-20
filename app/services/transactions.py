@@ -20,6 +20,8 @@ from app.models import (
     Sale,
     SaleLine,
     StockBook,
+    FIFOLayer,
+    StockLedgerEntry,
     Supplier,
     TransferLine,
 )
@@ -223,6 +225,71 @@ def create_purchase(data, lines, user):
         )
     )
     audit("create", "Purchase", purchase.id, bill_number, user=user)
+    return purchase
+
+
+def update_purchase_header(purchase, data, user):
+    supplier = active_supplier(data.get("supplier_id"))
+    bill_number = data.get("bill_number", "").strip()
+    if not bill_number:
+        raise ValueError("Bill number is required.")
+    bill_date = parse_date(data.get("bill_date"), "Bill date")
+    due_date = (
+        parse_date(data["due_date"], "Due date")
+        if data.get("due_date")
+        else default_due(bill_date, supplier.default_credit_days)
+    )
+
+    before = {
+        "supplier_id": purchase.supplier_id,
+        "bill_number": purchase.bill_number,
+        "bill_date": purchase.bill_date,
+        "due_date": purchase.due_date,
+        "remarks": purchase.remarks,
+    }
+
+    purchase.supplier_id = supplier.id
+    purchase.bill_number = bill_number
+    purchase.bill_date = bill_date
+    purchase.due_date = due_date
+    purchase.remarks = data.get("remarks") or None
+    purchase.updated_by_id = getattr(user, "id", None)
+
+    payable = Payable.query.filter_by(source_type="PURCHASE", source_id=purchase.id).first()
+    if payable:
+        payable.supplier_id = supplier.id
+        payable.document_number = bill_number
+        payable.document_date = bill_date
+        payable.due_date = due_date
+        payable.remarks = purchase.remarks
+        payable.updated_by_id = getattr(user, "id", None)
+
+    FIFOLayer.query.filter_by(source_type="PURCHASE", source_id=purchase.id).update(
+        {"source_reference": bill_number, "source_date": bill_date},
+        synchronize_session=False,
+    )
+    StockLedgerEntry.query.filter_by(
+        transaction_type="PURCHASE", transaction_id=purchase.id
+    ).update(
+        {"reference_number": bill_number, "entry_date": bill_date},
+        synchronize_session=False,
+    )
+
+    audit(
+        "edit",
+        "Purchase",
+        purchase.id,
+        bill_number,
+        before=before,
+        after={
+            "supplier_id": purchase.supplier_id,
+            "bill_number": purchase.bill_number,
+            "bill_date": purchase.bill_date,
+            "due_date": purchase.due_date,
+            "remarks": purchase.remarks,
+        },
+        user=user,
+    )
     return purchase
 
 

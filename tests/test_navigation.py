@@ -25,6 +25,9 @@ def test_company_login_selects_aditya_context(client):
     response = login(client)
     assert response.status_code == 200
     assert b"Aditya International" in response.data
+    assert b'body class="theme-aditya"' in response.data
+    assert b"Aditya StockFlow" in response.data
+    assert b"aditya-logo.jpg" in response.data
     assert b"Choose Company" not in response.data
 
 
@@ -32,6 +35,9 @@ def test_company_login_selects_firsttech_context(client):
     response = login(client, "firsttech.user", "Firsttech2026")
     assert response.status_code == 200
     assert b"FirstTech Machine LLP" in response.data
+    assert b'body class="theme-firsttech"' in response.data
+    assert b"FirstTech StockFlow" in response.data
+    assert b"firsttech-logo.jpg" in response.data
     assert b"Choose Company" not in response.data
 
 

@@ -9,6 +9,18 @@ COMPANY_LOGOS = {
     "AI": "img/aditya-logo.jpg",
 }
 COMPANY_ORDER = {"FML": 0, "AI": 1}
+COMPANY_THEMES = {
+    "FML": {
+        "body_class": "theme-firsttech",
+        "app_name": "FirstTech StockFlow",
+        "tagline": "Next generation technology stock control",
+    },
+    "AI": {
+        "body_class": "theme-aditya",
+        "app_name": "Aditya StockFlow",
+        "tagline": "Jewellery factory supplies stock control",
+    },
+}
 USER_COMPANY_CODES = {
     "firsttech.user": "FML",
     "adityainternational.user": "AI",
@@ -22,6 +34,16 @@ def company_choices():
 
 def company_logo(company):
     return COMPANY_LOGOS.get(company.code, "img/fastockflow-icon.png")
+
+
+def company_theme(company):
+    if not company:
+        return {
+            "body_class": "theme-default",
+            "app_name": "FAstockFlow",
+            "tagline": "Stock & Ledger System",
+        }
+    return COMPANY_THEMES.get(company.code, COMPANY_THEMES.get("AI"))
 
 
 def active_company():

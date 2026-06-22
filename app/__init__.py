@@ -66,7 +66,14 @@ def register_company_gate(app):
 
 def register_template_helpers(app):
     from app.core.formatting import fmt_money, fmt_qty
-    from app.core.company_context import active_company, company_choices, company_logo, other_company, user_has_fixed_company
+    from app.core.company_context import (
+        active_company,
+        company_choices,
+        company_logo,
+        company_theme,
+        other_company,
+        user_has_fixed_company,
+    )
     from app.core.security import can
     from app.models import Payable, Receivable
 
@@ -97,6 +104,7 @@ def register_template_helpers(app):
             return receivables + payables
 
         selected_company = active_company() if current_user.is_authenticated else None
+        selected_theme = company_theme(selected_company)
         choices = company_choices() if current_user.is_authenticated else []
         fixed_company_user = user_has_fixed_company(current_user) if current_user.is_authenticated else False
         return {
@@ -110,6 +118,8 @@ def register_template_helpers(app):
             "company_choices": choices,
             "user_fixed_company": fixed_company_user,
             "company_logo": company_logo,
+            "company_theme": company_theme,
+            "active_company_theme": selected_theme,
             "other_company": other_company(selected_company) if selected_company else None,
         }
 

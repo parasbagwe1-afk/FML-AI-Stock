@@ -4,18 +4,18 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}FAstockFlow{% endblock %}</title>
-    <link rel="icon" href="{{ url_for('static', filename='img/fastockflow-icon.png', v=asset_version) }}">
+    <link rel="icon" href="{{ url_for('static', filename=company_logo(active_company) if active_company else 'img/fastockflow-icon.png', v=asset_version) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=asset_version) }}">
   </head>
-  <body>
+  <body class="{{ active_company_theme.body_class }}">
     {% if current_user.is_authenticated %}
       <div class="app-shell">
         <aside class="sidebar">
           <a class="brand" href="{{ url_for('dashboard.index') }}">
-            <span class="brand-mark logo-mark"><img src="{{ url_for('static', filename='img/fastockflow-icon.png', v=asset_version) }}" alt="FAstockFlow"></span>
+            <span class="brand-mark logo-mark company-brand-mark"><img src="{{ url_for('static', filename=company_logo(active_company) if active_company else 'img/fastockflow-icon.png', v=asset_version) }}" alt="{{ active_company.name if active_company else 'FAstockFlow' }}"></span>
             <span>
-              <strong>FAstockFlow</strong>
-              <small>Stock & Ledger System</small>
+              <strong>{{ active_company_theme.app_name }}</strong>
+              <small>{{ active_company.name if active_company else active_company_theme.tagline }}</small>
             </span>
           </a>
           <nav class="nav">

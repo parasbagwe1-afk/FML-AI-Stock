@@ -67,6 +67,37 @@ function updateMusicControls() {
   controls.volume.value = String(Math.round(musicSettings.volume * 100));
 }
 
+function showPageLoading() {
+  document.body.classList.add("is-loading");
+}
+
+function hidePageLoading() {
+  document.body.classList.remove("is-loading");
+}
+
+function setButtonLoading(button, loading) {
+  if (!button) return;
+  button.classList.toggle("is-loading", loading);
+  button.toggleAttribute("aria-busy", loading);
+  if (loading) {
+    if (!Object.prototype.hasOwnProperty.call(button.dataset, "originalDisabled")) {
+      button.dataset.originalDisabled = String(button.disabled);
+    }
+    button.disabled = true;
+  } else {
+    button.disabled = button.dataset.originalDisabled === "true";
+    delete button.dataset.originalDisabled;
+  }
+}
+
+function setFormSubmitting(form, submitter) {
+  if (!form || form.classList.contains("is-submitting")) return;
+  form.classList.add("is-submitting");
+  form.querySelectorAll('button[type="submit"]').forEach((button) => setButtonLoading(button, true));
+  if (submitter && submitter.matches("button")) setButtonLoading(submitter, true);
+  showPageLoading();
+}
+
 function targetMusicVolume() {
   return musicSettings.muted ? 0 : musicSettings.volume;
 }
@@ -230,13 +261,16 @@ document.addEventListener("click", async (event) => {
   if (auto) {
     const target = document.querySelector(auto.dataset.target);
     if (!target) return;
-    auto.disabled = true;
+    setButtonLoading(auto, true);
+    showPageLoading();
     try {
       const response = await fetch(`/transactions/reference/${auto.dataset.autoRef}`);
+      if (!response.ok) throw new Error("Reference request failed");
       const data = await response.json();
       target.value = data.reference;
     } finally {
-      auto.disabled = false;
+      setButtonLoading(auto, false);
+      hidePageLoading();
     }
   }
 
@@ -250,11 +284,20 @@ document.addEventListener("submit", (event) => {
     event.preventDefault();
     return;
   }
+  setFormSubmitting(form, event.submitter);
   if (message && /(delete|deactivate|reverse)/i.test(message)) {
     event.preventDefault();
     playTone("delete");
     window.setTimeout(() => HTMLFormElement.prototype.submit.call(form), 130);
   }
+});
+
+window.addEventListener("pageshow", () => {
+  hidePageLoading();
+  document.querySelectorAll("form.is-submitting").forEach((form) => {
+    form.classList.remove("is-submitting");
+    form.querySelectorAll("button.is-loading").forEach((button) => setButtonLoading(button, false));
+  });
 });
 
 function formatPreviewMoney(value) {

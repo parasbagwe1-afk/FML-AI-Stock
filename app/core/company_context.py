@@ -33,6 +33,8 @@ def company_choices():
 
 
 def company_logo(company):
+    if not company:
+        return "img/fastockflow-icon.png"
     return COMPANY_LOGOS.get(company.code, "img/fastockflow-icon.png")
 
 

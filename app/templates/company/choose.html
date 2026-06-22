@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block page_title %}Choose Company{% endblock %}
+{% block page_subtitle %}Select the company workspace for this session.{% endblock %}
+{% block content %}
+  <section class="company-choice-grid">
+    {% for company in companies %}
+      <form method="post" action="{{ url_for('company.select') }}" class="company-choice-card {{ 'active' if active_company and active_company.id == company.id else '' }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="company_id" value="{{ company.id }}">
+        <input type="hidden" name="next" value="{{ next_url }}">
+        <button type="submit">
+          <span class="company-choice-logo">
+            <img src="{{ url_for('static', filename=company_logo(company), v=asset_version) }}" alt="{{ company.name }}">
+          </span>
+          <span class="company-choice-name">{{ company.name }}</span>
+          <small>{{ company.code }} workspace</small>
+        </button>
+      </form>
+    {% else %}
+      <div class="panel">
+        <p class="empty">No active companies are available.</p>
+      </div>
+    {% endfor %}
+  </section>
+{% endblock %}

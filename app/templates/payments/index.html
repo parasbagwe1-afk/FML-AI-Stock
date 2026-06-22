@@ -7,7 +7,7 @@
       <h2>Customer Receipt</h2>
       <form method="post" action="{{ url_for('payments.customer_receipt') }}" class="form-stack">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label>Company <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}">{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
+        <label>Company <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if active_company and company.id == active_company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
         <label>Customer <select name="customer_id" required>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.code }} - {{ customer.name }}</option>{% endfor %}</select></label>
         <label>Invoice
           <select name="receivable_id">
@@ -31,7 +31,7 @@
       <h2>Supplier Payment</h2>
       <form method="post" action="{{ url_for('payments.supplier_payment') }}" class="form-stack">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label>Company <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}">{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
+        <label>Company <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if active_company and company.id == active_company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
         <label>Supplier <select name="supplier_id" required>{% for supplier in suppliers %}<option value="{{ supplier.id }}">{{ supplier.code }} - {{ supplier.name }}</option>{% endfor %}</select></label>
         <label>Bill
           <select name="payable_id">

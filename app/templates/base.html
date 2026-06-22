@@ -46,8 +46,16 @@
             {% endfor %}
           </nav>
           <div class="sidebar-footer">
-            <a class="footer-link" href="{{ url_for('dashboard.index') }}">FirstTech Machine LLP</a>
-            <a class="footer-link" href="{{ url_for('dashboard.index') }}">Aditya International</a>
+            {% for company in company_choices %}
+              {% if not user_fixed_company or (active_company and active_company.id == company.id) %}
+                <form method="post" action="{{ url_for('company.select') }}" class="footer-company-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="company_id" value="{{ company.id }}">
+                  <input type="hidden" name="next" value="{{ url_for('dashboard.index') }}">
+                  <button class="footer-link {{ 'active' if active_company and active_company.id == company.id else '' }}" type="submit">{{ company.name }}</button>
+                </form>
+              {% endif %}
+            {% endfor %}
             <form action="{{ url_for('auth.logout') }}" method="post">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="ghost-button full" type="submit">Logout</button>
@@ -61,6 +69,12 @@
               <p>{% block page_subtitle %}Real-time stock, FIFO, payments and inter-company control{% endblock %}</p>
             </div>
             <div class="topbar-actions">
+              {% if active_company %}
+                <a class="company-chip" href="{{ url_for('company.choose') }}">
+                  <img src="{{ url_for('static', filename=company_logo(active_company), v=asset_version) }}" alt="">
+                  <span>{{ active_company.name }}</span>
+                </a>
+              {% endif %}
               <div class="music-control" data-music-control>
                 <button class="music-toggle" type="button" data-music-toggle aria-label="Mute background music" aria-pressed="false" title="Mute background music">
                   <svg class="music-icon music-icon-on" viewBox="0 0 24 24" aria-hidden="true">

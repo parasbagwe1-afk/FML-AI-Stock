@@ -16,6 +16,7 @@ from app.services.transactions import (
     void_sale,
 )
 from tests.test_fifo_workflows import admin, ids
+from tests.test_navigation import login
 from app.services.stock import available_quantity
 
 
@@ -164,11 +165,7 @@ def test_sales_user_sees_edit_for_existing_sale(client, app):
         db.session.commit()
         edit_href = f"/transactions/sale/{sale.id}/edit"
 
-    client.post(
-        "/login",
-        data={"email": "sales@example.com", "password": "Sales123!"},
-        follow_redirects=True,
-    )
+    login(client, "sales@example.com", "Sales123!", company_code="AI")
     list_response = client.get("/transactions/sale")
     assert list_response.status_code == 200
     assert edit_href.encode() in list_response.data
@@ -246,11 +243,7 @@ def test_stock_user_sees_edit_for_existing_transfer(client, app):
         db.session.commit()
         edit_href = f"/transactions/transfer/{transfer.id}/edit"
 
-    client.post(
-        "/login",
-        data={"email": "transfer-stock@example.com", "password": "Stock123!"},
-        follow_redirects=True,
-    )
+    login(client, "transfer-stock@example.com", "Stock123!", company_code="AI")
     list_response = client.get("/transactions/transfer")
     assert list_response.status_code == 200
     assert edit_href.encode() in list_response.data

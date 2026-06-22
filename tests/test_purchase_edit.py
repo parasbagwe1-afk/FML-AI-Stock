@@ -6,6 +6,7 @@ from app.models import FIFOLayer, Payable, Purchase, StockLedgerEntry, User
 from app.services.stock import available_quantity
 from app.services.transactions import create_purchase, create_sale, update_purchase_header, update_purchase_lines
 from tests.test_fifo_workflows import admin, ids
+from tests.test_navigation import login
 
 
 def test_purchase_header_edit_updates_linked_references(app):
@@ -206,11 +207,7 @@ def test_purchase_edit_page_renders(client, app):
         db.session.commit()
         purchase_id = purchase.id
 
-    client.post(
-        "/login",
-        data={"email": "admin@fastockflow.local", "password": "ChangeMe123!"},
-        follow_redirects=True,
-    )
+    login(client)
     response = client.get(f"/transactions/purchase/{purchase_id}/edit")
     assert response.status_code == 200
     assert b"Edit Purchase" in response.data
@@ -243,11 +240,7 @@ def test_stock_user_sees_edit_for_existing_purchase(client, app):
         db.session.commit()
         edit_href = f"/transactions/purchase/{purchase.id}/edit"
 
-    client.post(
-        "/login",
-        data={"email": "stock@example.com", "password": "Stock123!"},
-        follow_redirects=True,
-    )
+    login(client, "stock@example.com", "Stock123!", company_code="AI")
     list_response = client.get("/transactions/purchase")
     assert list_response.status_code == 200
     assert edit_href.encode() in list_response.data

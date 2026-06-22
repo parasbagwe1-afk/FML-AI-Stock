@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from pathlib import Path
 
-from flask import Flask, render_template, request
+from flask import Flask, redirect, render_template, request, url_for
 from flask_login import current_user
 
 from app.config import Config
@@ -19,6 +19,7 @@ def create_app(config_object=None):
 
     from app import models  # noqa: F401
     from app.auth.routes import bp as auth_bp
+    from app.company.routes import bp as company_bp
     from app.dashboard.routes import bp as dashboard_bp
     from app.masters.routes import bp as masters_bp
     from app.payments.routes import bp as payments_bp
@@ -27,6 +28,7 @@ def create_app(config_object=None):
     from app.users.routes import bp as users_bp
 
     app.register_blueprint(auth_bp)
+    app.register_blueprint(company_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(masters_bp)
     app.register_blueprint(transactions_bp)
@@ -35,13 +37,36 @@ def create_app(config_object=None):
     app.register_blueprint(users_bp)
 
     register_template_helpers(app)
+    register_company_gate(app)
     register_cli(app)
     register_error_handlers(app)
     return app
 
 
+def register_company_gate(app):
+    from flask_login import current_user
+
+    from app.core.company_context import active_company, set_active_company_for_user
+
+    @app.before_request
+    def require_company_context():
+        if request.endpoint in {None, "static"}:
+            return None
+        if not current_user.is_authenticated:
+            return None
+        if request.endpoint in {"auth.logout", "company.choose", "company.select"}:
+            return None
+        if active_company():
+            return None
+        if set_active_company_for_user(current_user):
+            return None
+        next_url = request.full_path if request.query_string else request.path
+        return redirect(url_for("company.choose", next=next_url))
+
+
 def register_template_helpers(app):
     from app.core.formatting import fmt_money, fmt_qty
+    from app.core.company_context import active_company, company_choices, company_logo, other_company, user_has_fixed_company
     from app.core.security import can
     from app.models import Payable, Receivable
 
@@ -71,6 +96,9 @@ def register_template_helpers(app):
             ).count()
             return receivables + payables
 
+        selected_company = active_company() if current_user.is_authenticated else None
+        choices = company_choices() if current_user.is_authenticated else []
+        fixed_company_user = user_has_fixed_company(current_user) if current_user.is_authenticated else False
         return {
             "can": can,
             "fmt_money": fmt_money,
@@ -78,6 +106,11 @@ def register_template_helpers(app):
             "is_active_nav": is_active_nav,
             "due_alert_count": due_alert_count(),
             "asset_version": app.config.get("STATIC_ASSET_VERSION", "1"),
+            "active_company": selected_company,
+            "company_choices": choices,
+            "user_fixed_company": fixed_company_user,
+            "company_logo": company_logo,
+            "other_company": other_company(selected_company) if selected_company else None,
         }
 
 

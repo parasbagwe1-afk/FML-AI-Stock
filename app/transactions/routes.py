@@ -1,6 +1,7 @@
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
+from app.core.company_context import active_company
 from app.core.forms import item_lines_from_form, transfer_lines_from_form
 from app.core.security import can, require_permission
 from app.extensions import db
@@ -56,6 +57,11 @@ def options():
     }
 
 
+def active_company_id():
+    company = active_company()
+    return company.id if company else None
+
+
 @bp.route("/reference/<kind>")
 @login_required
 def reference(kind):
@@ -76,7 +82,11 @@ def purchase():
         except Exception as exc:
             db.session.rollback()
             flash(str(exc), "danger")
-    purchases = Purchase.query.filter_by(is_void=False).order_by(Purchase.bill_date.desc(), Purchase.id.desc()).limit(20).all()
+    purchases = Purchase.query.filter_by(is_void=False)
+    company_id = active_company_id()
+    if company_id:
+        purchases = purchases.filter(Purchase.company_id == company_id)
+    purchases = purchases.order_by(Purchase.bill_date.desc(), Purchase.id.desc()).limit(20).all()
     return render_template("transactions/purchase.html", purchases=purchases, **options())
 
 
@@ -135,7 +145,11 @@ def sale():
         except Exception as exc:
             db.session.rollback()
             flash(str(exc), "danger")
-    sales = Sale.query.filter_by(is_void=False).order_by(Sale.invoice_date.desc(), Sale.id.desc()).limit(20).all()
+    sales = Sale.query.filter_by(is_void=False)
+    company_id = active_company_id()
+    if company_id:
+        sales = sales.filter(Sale.company_id == company_id)
+    sales = sales.order_by(Sale.invoice_date.desc(), Sale.id.desc()).limit(20).all()
     return render_template("transactions/sale.html", sales=sales, **options())
 
 
@@ -194,7 +208,16 @@ def transfer():
         except Exception as exc:
             db.session.rollback()
             flash(str(exc), "danger")
-    transfers = InterCompanyTransfer.query.filter_by(is_void=False).order_by(InterCompanyTransfer.transfer_date.desc(), InterCompanyTransfer.id.desc()).limit(20).all()
+    transfers = InterCompanyTransfer.query.filter_by(is_void=False)
+    company_id = active_company_id()
+    if company_id:
+        transfers = transfers.filter(
+            db.or_(
+                InterCompanyTransfer.from_company_id == company_id,
+                InterCompanyTransfer.to_company_id == company_id,
+            )
+        )
+    transfers = transfers.order_by(InterCompanyTransfer.transfer_date.desc(), InterCompanyTransfer.id.desc()).limit(20).all()
     return render_template(
         "transactions/transfer.html",
         transfers=transfers,
@@ -247,12 +270,22 @@ def transfer_delete(transfer_id):
 @login_required
 @require_permission("opening", "view")
 def opening():
+    company_id = active_company_id()
+    opening_stock = OpeningStock.query.filter_by(is_void=False)
+    receivables = Receivable.query.filter_by(is_opening=True)
+    payables = Payable.query.filter_by(is_opening=True)
+    advances = Payment.query.filter(Payment.payment_type.like("OPENING_ADVANCE%"))
+    if company_id:
+        opening_stock = opening_stock.filter(OpeningStock.company_id == company_id)
+        receivables = receivables.filter(Receivable.company_id == company_id)
+        payables = payables.filter(Payable.company_id == company_id)
+        advances = advances.filter(Payment.company_id == company_id)
     return render_template(
         "transactions/opening.html",
-        opening_stock=OpeningStock.query.filter_by(is_void=False).order_by(OpeningStock.opening_date.desc()).limit(20).all(),
-        receivables=Receivable.query.filter_by(is_opening=True).order_by(Receivable.document_date.desc()).limit(20).all(),
-        payables=Payable.query.filter_by(is_opening=True).order_by(Payable.document_date.desc()).limit(20).all(),
-        advances=Payment.query.filter(Payment.payment_type.like("OPENING_ADVANCE%")).order_by(Payment.payment_date.desc()).limit(20).all(),
+        opening_stock=opening_stock.order_by(OpeningStock.opening_date.desc()).limit(20).all(),
+        receivables=receivables.order_by(Receivable.document_date.desc()).limit(20).all(),
+        payables=payables.order_by(Payable.document_date.desc()).limit(20).all(),
+        advances=advances.order_by(Payment.payment_date.desc()).limit(20).all(),
         **options(),
     )
 

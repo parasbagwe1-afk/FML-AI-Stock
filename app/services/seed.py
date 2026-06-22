@@ -33,6 +33,7 @@ def seed_all(app):
         seed_customers()
         seed_payment_modes()
         seed_admin(app)
+        seed_company_users()
         db.session.commit()
 
 
@@ -196,3 +197,31 @@ def seed_admin(app):
             after={"email": admin.email, "role": admin.role, "seeded_at": datetime.utcnow()},
             user=admin,
         )
+
+
+def seed_company_users():
+    rows = [
+        ("firsttech.user", "FirstTech User", "Firsttech2026"),
+        ("adityainternational.user", "Aditya International User", "Aditya2026"),
+    ]
+    for login_id, name, password in rows:
+        user, created = get_or_create(
+            User,
+            email=login_id,
+            defaults={
+                "name": name,
+                "role": ROLE_ADMIN,
+                "active": True,
+                "password_hash": "placeholder",
+            },
+        )
+        if created or user.password_hash == "placeholder":
+            user.set_password(password)
+            user.last_login_at = None
+            audit(
+                "seed_company_user",
+                "User",
+                reference=user.email,
+                after={"email": user.email, "role": user.role, "seeded_at": datetime.utcnow()},
+                user=user,
+            )

@@ -4,6 +4,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.extensions import db
+from app.core.company_context import clear_active_company, set_active_company_for_user
 from app.models import User
 from app.services.audit import audit
 
@@ -31,10 +32,15 @@ def login():
             flash("This user is inactive. Ask an administrator to reactivate it.", "danger")
         else:
             login_user(user)
+            clear_active_company()
+            company = set_active_company_for_user(user)
             user.last_login_at = datetime.utcnow()
             audit("login", "User", user.id, user.email, user=user)
             db.session.commit()
-            return redirect(request.args.get("next") or url_for("dashboard.index"))
+            next_url = request.args.get("next") or url_for("dashboard.index")
+            if company:
+                return redirect(next_url)
+            return redirect(url_for("company.choose", next=next_url))
     return render_template("auth/login.html")
 
 

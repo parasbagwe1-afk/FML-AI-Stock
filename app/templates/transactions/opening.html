@@ -7,7 +7,7 @@
       <summary>Opening Stock</summary>
       <form method="post" action="{{ url_for('transactions.opening_save', section='stock') }}" class="form-grid wide">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label>Company <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}">{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
+        <label>Company <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if active_company and company.id == active_company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
         <label>Reference <span class="input-action"><input id="opening_ref" name="reference_number" required><button type="button" data-auto-ref="opening_stock" data-target="#opening_ref">Auto</button></span></label>
         <label>Opening date <input name="opening_date" type="date" required></label>
         <label class="full-span">Remarks <textarea name="remarks"></textarea></label>
@@ -21,8 +21,8 @@
       <form method="post" action="{{ url_for('transactions.opening_save', section='pending-stock') }}" class="form-grid wide">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="mismatch_approved" value="1">
-        <label>Owner company <select name="from_company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if company.code == 'FML' %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
-        <label>Pending with <select name="to_company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if company.code == 'AI' %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
+        <label>Owner company <select name="from_company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if active_company and company.id == active_company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
+        <label>Pending with <select name="to_company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if other_company and company.id == other_company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
         <label>Reference <span class="input-action"><input id="opening_pending_ref" name="reference_number" required><button type="button" data-auto-ref="transfer" data-target="#opening_pending_ref">Auto</button></span></label>
         <label>Opening date <input name="transfer_date" type="date" required></label>
         <label class="full-span">Remarks <textarea name="remarks"></textarea></label>
@@ -35,7 +35,7 @@
       <summary>Opening Customer Receivable</summary>
       <form method="post" action="{{ url_for('transactions.opening_save', section='receivable') }}" class="form-grid wide">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label>Company <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}">{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
+        <label>Company <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if active_company and company.id == active_company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
         <label>Customer <select name="customer_id" required>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.code }} - {{ customer.name }}</option>{% endfor %}</select></label>
         <label>Sale type <select name="sale_type"><option value="GST">GST</option><option value="CASH">CASH</option></select></label>
         <label>Old invoice/ref <input name="reference_number" required></label>
@@ -51,7 +51,7 @@
       <summary>Opening Supplier Payable</summary>
       <form method="post" action="{{ url_for('transactions.opening_save', section='payable') }}" class="form-grid wide">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label>Company <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}">{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
+        <label>Company <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if active_company and company.id == active_company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
         <label>Supplier <select name="supplier_id" required>{% for supplier in suppliers %}<option value="{{ supplier.id }}">{{ supplier.code }} - {{ supplier.name }}</option>{% endfor %}</select></label>
         <label>Purchase type <select name="purchase_type"><option value="GST">GST</option><option value="CASH">CASH</option></select></label>
         <label>Old bill/ref <input name="reference_number" required></label>
@@ -67,7 +67,7 @@
       <summary>Opening Advance Received</summary>
       <form method="post" action="{{ url_for('transactions.opening_save', section='advance-received') }}" class="form-grid wide">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label>Company <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}">{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
+        <label>Company <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if active_company and company.id == active_company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
         <label>Customer <select name="customer_id" required>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.code }} - {{ customer.name }}</option>{% endfor %}</select></label>
         <label>Payment date <input name="payment_date" type="date" required></label>
         <label>Mode <select name="mode">{% for mode in payment_modes %}<option value="{{ mode.code }}">{{ mode.name }}</option>{% endfor %}</select></label>
@@ -82,7 +82,7 @@
       <summary>Opening Advance Paid</summary>
       <form method="post" action="{{ url_for('transactions.opening_save', section='advance-paid') }}" class="form-grid wide">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label>Company <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}">{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
+        <label>Company <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if active_company and company.id == active_company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select></label>
         <label>Supplier <select name="supplier_id" required>{% for supplier in suppliers %}<option value="{{ supplier.id }}">{{ supplier.code }} - {{ supplier.name }}</option>{% endfor %}</select></label>
         <label>Payment date <input name="payment_date" type="date" required></label>
         <label>Mode <select name="mode">{% for mode in payment_modes %}<option value="{{ mode.code }}">{{ mode.name }}</option>{% endfor %}</select></label>

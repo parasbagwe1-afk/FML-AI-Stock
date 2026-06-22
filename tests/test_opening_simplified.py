@@ -1,4 +1,4 @@
-from app.models import FIFOLayer, InterCompanyTransfer, OpeningStock
+from app.models import FIFOLayer, InterCompanyTransfer, OpeningStock, StockLedgerEntry
 from tests.test_fifo_workflows import ids
 from tests.test_navigation import login
 
@@ -45,6 +45,39 @@ def test_opening_stock_saves_without_stock_book_or_rate(client, app):
         assert opening.stock_book.code == "AI_GST"
         assert layer.unit_cost == 0
         assert layer.available_quantity == 5
+
+
+def test_opening_stock_can_be_negative(client, app):
+    with app.app_context():
+        data = ids()
+        company_id = data["ai"].id
+        item_id = data["item"].id
+
+    login(client)
+    response = client.post(
+        "/transactions/opening/stock",
+        data={
+            "company_id": company_id,
+            "reference_number": "OPEN-NEGATIVE",
+            "opening_date": "2026-06-22",
+            "item_id[]": [item_id],
+            "quantity[]": ["-2"],
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Opening stock OPEN-NEGATIVE saved." in response.data
+
+    with app.app_context():
+        opening = OpeningStock.query.filter_by(reference_number="OPEN-NEGATIVE").one()
+        ledger = StockLedgerEntry.query.filter_by(
+            transaction_type="OPENING_STOCK",
+            transaction_id=opening.id,
+        ).one()
+        assert opening.lines[0].quantity == -2
+        assert ledger.quantity_in == 0
+        assert ledger.quantity_out == 2
+        assert FIFOLayer.query.filter_by(source_type="OPENING_STOCK", source_id=opening.id).count() == 0
 
 
 def test_opening_pending_stock_saves_without_stock_books_or_rate(client, app):

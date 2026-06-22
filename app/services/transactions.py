@@ -211,7 +211,9 @@ def create_opening_stock(data, lines, user):
     db.session.flush()
     for row in _clean_lines(lines):
         item = active_item(row.get("item_id"))
-        quantity = positive_qty(row.get("quantity"))
+        quantity = qty(row.get("quantity"))
+        if quantity == Decimal("0.000"):
+            raise ValueError("Quantity cannot be zero.")
         rate = _optional_opening_rate(row.get("rate"))
         line = OpeningStockLine(
             opening_stock_id=opening.id,
@@ -223,29 +225,30 @@ def create_opening_stock(data, lines, user):
         )
         db.session.add(line)
         db.session.flush()
-        create_fifo_layer(
-            company.id,
-            stock_book.id,
-            item.id,
-            "OPENING_STOCK",
-            opening.id,
-            line.id,
-            reference,
-            opening_date,
-            quantity,
-            rate,
-            getattr(user, "id", None),
-        )
+        if quantity > Decimal("0.000"):
+            create_fifo_layer(
+                company.id,
+                stock_book.id,
+                item.id,
+                "OPENING_STOCK",
+                opening.id,
+                line.id,
+                reference,
+                opening_date,
+                quantity,
+                rate,
+                getattr(user, "id", None),
+            )
         stock_ledger(
             company.id,
             stock_book.id,
             item.id,
             opening_date,
-            "IN",
+            "IN" if quantity > Decimal("0.000") else "OUT",
             "OPENING_STOCK",
             opening.id,
             reference,
-            quantity,
+            abs(quantity),
             rate,
             "Opening stock",
             getattr(user, "id", None),

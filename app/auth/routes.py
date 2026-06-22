@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, get_flashed_messages, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.extensions import db
@@ -9,6 +9,17 @@ from app.models import User
 from app.services.audit import audit
 
 bp = Blueprint("auth", __name__)
+
+
+def render_login(message="", category="danger"):
+    flashed = get_flashed_messages(with_categories=True)
+    if not message and flashed:
+        category, message = flashed[0]
+    return render_template(
+        "auth/login.html",
+        login_message=message or "",
+        login_message_category=category or "info",
+    )
 
 
 @bp.route("/", methods=["GET"])
@@ -27,22 +38,21 @@ def login():
         password = request.form.get("password") or ""
         user = User.query.filter_by(email=email).first()
         if not user or not user.check_password(password):
-            flash("Invalid login ID or password.", "danger")
+            return render_login("Invalid login ID or password.", "danger")
         elif not user.active:
-            flash("This user is inactive. Ask an administrator to reactivate it.", "danger")
+            return render_login("This user is inactive. Ask an administrator to reactivate it.", "danger")
         else:
             clear_active_company()
             company = set_active_company_for_user(user)
             if not company:
-                flash("Use the FirstTech or Aditya company login.", "danger")
-                return render_template("auth/login.html")
+                return render_login("Use the FirstTech or Aditya company login.", "danger")
             login_user(user)
             user.last_login_at = datetime.utcnow()
             audit("login", "User", user.id, user.email, user=user)
             db.session.commit()
             next_url = request.args.get("next") or url_for("dashboard.index")
             return redirect(next_url)
-    return render_template("auth/login.html")
+    return render_login()
 
 
 @bp.route("/logout", methods=["POST"])

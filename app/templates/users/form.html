@@ -6,7 +6,20 @@
     <form method="post" class="form-grid">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label>Name <input name="name" value="{{ user.name or '' }}" required></label>
-      <label>Email/login <input name="email" type="email" value="{{ user.email or '' }}" required></label>
+      <label>Login ID <input name="email" type="text" value="{{ user.email or '' }}" required></label>
+      <label>Company
+        {% if can_manage_all_companies %}
+          <select name="company_id">
+            <option value="" {% if not user.company_id %}selected{% endif %}>Owner / all companies</option>
+            {% for company in companies %}
+              <option value="{{ company.id }}" {% if user.company_id == company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>
+            {% endfor %}
+          </select>
+        {% else %}
+          <input type="hidden" name="company_id" value="{{ selected_company.id if selected_company else '' }}">
+          <input value="{{ selected_company.name if selected_company else 'Active company' }}" disabled>
+        {% endif %}
+      </label>
       <label>Role
         <select name="role">{% for role in roles %}<option value="{{ role }}" {% if user.role == role %}selected{% endif %}>{{ role }}</option>{% endfor %}</select>
       </label>

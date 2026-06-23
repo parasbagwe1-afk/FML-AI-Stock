@@ -1,6 +1,7 @@
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
+from app.core.company_context import active_company, company_choices, user_can_view_all_companies
 from app.core.constants import MODULES, ROLES, ROLE_ADMIN
 from app.core.security import require_permission
 from app.extensions import db
@@ -14,7 +15,11 @@ bp = Blueprint("users", __name__, url_prefix="/users")
 @login_required
 @require_permission("users", "view")
 def index():
-    users = User.query.order_by(User.active.desc(), User.name).all()
+    query = User.query
+    if not user_can_view_all_companies(current_user):
+        company = active_company()
+        query = query.filter(User.company_id == company.id if company else False)
+    users = query.order_by(User.active.desc(), User.name).all()
     return render_template("users/index.html", users=users, roles=ROLES)
 
 
@@ -36,7 +41,7 @@ def create():
         except Exception as exc:
             db.session.rollback()
             flash(str(exc), "danger")
-    return render_template("users/form.html", user=user, roles=ROLES, modules=MODULES, override_map={})
+    return render_user_form(user, {})
 
 
 @bp.route("/<int:user_id>/edit", methods=["GET", "POST"])
@@ -44,7 +49,7 @@ def create():
 @require_permission("users", "edit")
 def edit(user_id):
     user = db.session.get(User, user_id)
-    if not user:
+    if not user or not can_manage_user_record(user):
         flash("User not found.", "danger")
         return redirect(url_for("users.index"))
     if request.method == "POST":
@@ -60,7 +65,7 @@ def edit(user_id):
         except Exception as exc:
             db.session.rollback()
             flash(str(exc), "danger")
-    return render_template("users/form.html", user=user, roles=ROLES, modules=MODULES, override_map=build_override_map(user))
+    return render_user_form(user, build_override_map(user))
 
 
 @bp.route("/<int:user_id>/deactivate", methods=["POST"])
@@ -68,7 +73,7 @@ def edit(user_id):
 @require_permission("users", "deactivate")
 def deactivate(user_id):
     user = db.session.get(User, user_id)
-    if not user:
+    if not user or not can_manage_user_record(user):
         flash("User not found.", "danger")
         return redirect(url_for("users.index"))
     try:
@@ -81,6 +86,29 @@ def deactivate(user_id):
         db.session.rollback()
         flash(str(exc), "danger")
     return redirect(url_for("users.index"))
+
+
+def render_user_form(user, override_map):
+    can_manage_all = user_can_view_all_companies(current_user)
+    selected_company = active_company()
+    companies = company_choices() if can_manage_all else ([selected_company] if selected_company else [])
+    return render_template(
+        "users/form.html",
+        user=user,
+        roles=ROLES,
+        modules=MODULES,
+        override_map=override_map,
+        companies=companies,
+        can_manage_all_companies=can_manage_all,
+        selected_company=selected_company,
+    )
+
+
+def can_manage_user_record(user):
+    if user_can_view_all_companies(current_user):
+        return True
+    company = active_company()
+    return bool(company and user.company_id == company.id)
 
 
 def apply_user_form(user, require_password):
@@ -98,6 +126,14 @@ def apply_user_form(user, require_password):
         raise ValueError("Name and email are required.")
     if user.role not in ROLES:
         raise ValueError("Invalid role.")
+    if user_can_view_all_companies(current_user):
+        raw_company_id = request.form.get("company_id")
+        user.company_id = int(raw_company_id) if raw_company_id else None
+    else:
+        company = active_company()
+        if not company:
+            raise ValueError("Select a company before managing users.")
+        user.company_id = company.id
 
     # Store only explicit per-user overrides. Blank means inherit role template.
     user.permission_overrides = []
@@ -119,11 +155,12 @@ def apply_user_form(user, require_password):
 
 
 def protect_last_admin(user):
-    if user.role == ROLE_ADMIN and user.active:
+    if user.role == ROLE_ADMIN and user.active and user.company_id is None:
         return
     active_admins = User.query.filter(
         User.id != user.id,
         User.role == ROLE_ADMIN,
+        User.company_id.is_(None),
         User.active.is_(True),
     ).count()
     if active_admins == 0:

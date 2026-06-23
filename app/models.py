@@ -21,11 +21,13 @@ class User(UserMixin, TimestampMixin, db.Model):
     name = db.Column(db.String(120), nullable=False)
     email = db.Column(db.String(255), nullable=False, unique=True, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
+    company_id = db.Column(db.Integer, db.ForeignKey("company.id"), nullable=True, index=True)
     role = db.Column(db.String(30), nullable=False, default="VIEWER", index=True)
     active = db.Column(db.Boolean, nullable=False, default=True)
     last_login_at = db.Column(db.DateTime, nullable=True)
     force_password_change = db.Column(db.Boolean, nullable=False, default=False)
 
+    company = db.relationship("Company", foreign_keys=[company_id])
     permission_overrides = db.relationship(
         "PermissionOverride", back_populates="user", cascade="all, delete-orphan"
     )

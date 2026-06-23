@@ -22,6 +22,7 @@ from app.models import (
     SaleLine,
     StockBook,
     StockLedgerEntry,
+    User,
 )
 from app.reports.exporting import export_table
 from app.services.stock import available_quantity, available_value
@@ -68,6 +69,13 @@ def scope_query_to_active_company(query, column):
 def in_active_company_scope(*company_ids):
     company_id = active_report_company_id()
     return not company_id or company_id in company_ids
+
+
+def creator_name(user_id):
+    if not user_id:
+        return "System"
+    user = db.session.get(User, int(user_id))
+    return user.name if user else "Unknown user"
 
 
 @bp.route("/")
@@ -145,7 +153,7 @@ def fifo_valuation_rows():
 
 
 def fifo_layer_rows():
-    headers = ["Company", "Stock book", "Item", "Layer date", "Source", "Reference", "Original qty", "Available qty", "Rate", "Available value", "Status"]
+    headers = ["Company", "Stock book", "Item", "Layer date", "Source", "Reference", "Original qty", "Available qty", "Rate", "Available value", "Status", "Created by"]
     rows = []
     query = scope_query_to_active_company(FIFOLayer.query, FIFOLayer.company_id)
     for layer in query.order_by(FIFOLayer.source_date, FIFOLayer.id).all():
@@ -161,12 +169,13 @@ def fifo_layer_rows():
             layer.unit_cost,
             fmt_money(layer.available_value),
             layer.status,
+            creator_name(layer.created_by_id),
         ])
     return headers, rows
 
 
 def stock_ledger_rows():
-    headers = ["Date", "Company", "Stock book", "Item", "Type", "Reference", "In", "Out", "Rate", "Value", "Remarks"]
+    headers = ["Date", "Company", "Stock book", "Item", "Type", "Reference", "In", "Out", "Rate", "Value", "Remarks", "Created by"]
     rows = []
     query = scope_query_to_active_company(StockLedgerEntry.query, StockLedgerEntry.company_id)
     for entry in query.order_by(StockLedgerEntry.entry_date, StockLedgerEntry.id).all():
@@ -182,12 +191,13 @@ def stock_ledger_rows():
             entry.rate,
             fmt_money(entry.value),
             entry.remarks or "",
+            creator_name(entry.created_by_id),
         ])
     return headers, rows
 
 
 def purchase_rows():
-    headers = ["Date", "Company", "Book", "Supplier", "Bill", "Type", "Subtotal", "GST", "Grand total", "Paid", "Balance", "Status"]
+    headers = ["Date", "Company", "Book", "Supplier", "Bill", "Type", "Subtotal", "GST", "Grand total", "Paid", "Balance", "Status", "Created by"]
     rows = []
     query = scope_query_to_active_company(Purchase.query.filter_by(is_void=False), Purchase.company_id)
     for purchase in query.order_by(Purchase.bill_date.desc(), Purchase.id.desc()).all():
@@ -204,12 +214,13 @@ def purchase_rows():
             fmt_money(purchase.paid_amount),
             fmt_money(purchase.balance_amount),
             purchase.payment_status,
+            creator_name(purchase.created_by_id),
         ])
     return headers, rows
 
 
 def sales_rows():
-    headers = ["Date", "Company", "Book", "Customer", "Invoice", "Type", "Subtotal", "GST", "Grand total", "FIFO cost", "Gross profit", "Balance", "Status"]
+    headers = ["Date", "Company", "Book", "Customer", "Invoice", "Type", "Subtotal", "GST", "Grand total", "FIFO cost", "Gross profit", "Balance", "Status", "Created by"]
     rows = []
     query = scope_query_to_active_company(Sale.query.filter_by(is_void=False), Sale.company_id)
     for sale in query.order_by(Sale.invoice_date.desc(), Sale.id.desc()).all():
@@ -227,6 +238,7 @@ def sales_rows():
             fmt_money(sale.gross_profit),
             fmt_money(sale.balance_amount),
             sale.payment_status,
+            creator_name(sale.created_by_id),
         ])
     return headers, rows
 
@@ -270,42 +282,42 @@ def gross_profit_rows():
 
 
 def customer_outstanding_rows():
-    headers = ["Company", "Customer", "Document", "Date", "Due date", "Total", "Paid", "Balance", "Status"]
+    headers = ["Company", "Customer", "Document", "Date", "Due date", "Total", "Paid", "Balance", "Status", "Created by"]
     rows = []
     query = scope_query_to_active_company(Receivable.query, Receivable.company_id)
     for rec in query.order_by(Receivable.due_date, Receivable.document_number).all():
         party = rec.customer.name if rec.customer else rec.counterparty_company.name
-        rows.append([rec.company.code, party, rec.document_number, rec.document_date, rec.due_date or "", fmt_money(rec.total_amount), fmt_money(rec.paid_amount), fmt_money(rec.balance_amount), rec.payment_status])
+        rows.append([rec.company.code, party, rec.document_number, rec.document_date, rec.due_date or "", fmt_money(rec.total_amount), fmt_money(rec.paid_amount), fmt_money(rec.balance_amount), rec.payment_status, creator_name(rec.created_by_id)])
     return headers, rows
 
 
 def supplier_outstanding_rows():
-    headers = ["Company", "Supplier", "Document", "Date", "Due date", "Total", "Paid", "Balance", "Status"]
+    headers = ["Company", "Supplier", "Document", "Date", "Due date", "Total", "Paid", "Balance", "Status", "Created by"]
     rows = []
     query = scope_query_to_active_company(Payable.query, Payable.company_id)
     for pay in query.order_by(Payable.due_date, Payable.document_number).all():
         party = pay.supplier.name if pay.supplier else pay.counterparty_company.name
-        rows.append([pay.company.code, party, pay.document_number, pay.document_date, pay.due_date or "", fmt_money(pay.total_amount), fmt_money(pay.paid_amount), fmt_money(pay.balance_amount), pay.payment_status])
+        rows.append([pay.company.code, party, pay.document_number, pay.document_date, pay.due_date or "", fmt_money(pay.total_amount), fmt_money(pay.paid_amount), fmt_money(pay.balance_amount), pay.payment_status, creator_name(pay.created_by_id)])
     return headers, rows
 
 
 def advances_rows():
-    headers = ["Date", "Company", "Type", "Party", "Mode", "Original", "Allocated", "Unallocated", "Reference"]
+    headers = ["Date", "Company", "Type", "Party", "Mode", "Original", "Allocated", "Unallocated", "Reference", "Created by"]
     rows = []
     query = scope_query_to_active_company(Payment.query.filter(Payment.unallocated_amount > 0), Payment.company_id)
     for payment in query.order_by(Payment.payment_date.desc()).all():
         party = payment.customer.name if payment.customer else payment.supplier.name if payment.supplier else ""
-        rows.append([payment.payment_date, payment.company.code, payment.payment_type, party, payment.mode, fmt_money(payment.total_amount), fmt_money(payment.allocated_amount), fmt_money(payment.unallocated_amount), payment.reference_number or ""])
+        rows.append([payment.payment_date, payment.company.code, payment.payment_type, party, payment.mode, fmt_money(payment.total_amount), fmt_money(payment.allocated_amount), fmt_money(payment.unallocated_amount), payment.reference_number or "", creator_name(payment.created_by_id)])
     return headers, rows
 
 
 def payment_history_rows():
-    headers = ["Date", "Company", "Type", "Party", "Mode", "Amount", "Allocated", "Unallocated", "Reference"]
+    headers = ["Date", "Company", "Type", "Party", "Mode", "Amount", "Allocated", "Unallocated", "Reference", "Created by"]
     rows = []
     query = scope_query_to_active_company(Payment.query, Payment.company_id)
     for payment in query.order_by(Payment.payment_date.desc(), Payment.id.desc()).all():
         party = payment.customer.name if payment.customer else payment.supplier.name if payment.supplier else ""
-        rows.append([payment.payment_date, payment.company.code, payment.payment_type, party, payment.mode, fmt_money(payment.total_amount), fmt_money(payment.allocated_amount), fmt_money(payment.unallocated_amount), payment.reference_number or ""])
+        rows.append([payment.payment_date, payment.company.code, payment.payment_type, party, payment.mode, fmt_money(payment.total_amount), fmt_money(payment.allocated_amount), fmt_money(payment.unallocated_amount), payment.reference_number or "", creator_name(payment.created_by_id)])
     return headers, rows
 
 
@@ -378,21 +390,21 @@ def inter_company_rows():
 
 
 def opening_summary_rows():
-    headers = ["Type", "Company", "Party/Book", "Document", "Date", "Amount/Value", "Balance/Qty"]
+    headers = ["Type", "Company", "Party/Book", "Document", "Date", "Amount/Value", "Balance/Qty", "Created by"]
     rows = []
     layers = scope_query_to_active_company(FIFOLayer.query.filter_by(source_type="OPENING_STOCK"), FIFOLayer.company_id)
     for layer in layers.order_by(FIFOLayer.source_date.desc()).all():
-        rows.append(["Opening stock", layer.company.code, layer.stock_book.name, layer.source_reference, layer.source_date, fmt_money(layer.original_value), fmt_qty(layer.original_quantity)])
+        rows.append(["Opening stock", layer.company.code, layer.stock_book.name, layer.source_reference, layer.source_date, fmt_money(layer.original_value), fmt_qty(layer.original_quantity), creator_name(layer.created_by_id)])
     receivables = scope_query_to_active_company(Receivable.query.filter_by(is_opening=True), Receivable.company_id)
     for rec in receivables.all():
-        rows.append(["Opening receivable", rec.company.code, rec.customer.name if rec.customer else "", rec.document_number, rec.document_date, fmt_money(rec.total_amount), fmt_money(rec.balance_amount)])
+        rows.append(["Opening receivable", rec.company.code, rec.customer.name if rec.customer else "", rec.document_number, rec.document_date, fmt_money(rec.total_amount), fmt_money(rec.balance_amount), creator_name(rec.created_by_id)])
     payables = scope_query_to_active_company(Payable.query.filter_by(is_opening=True), Payable.company_id)
     for pay in payables.all():
-        rows.append(["Opening payable", pay.company.code, pay.supplier.name if pay.supplier else "", pay.document_number, pay.document_date, fmt_money(pay.total_amount), fmt_money(pay.balance_amount)])
+        rows.append(["Opening payable", pay.company.code, pay.supplier.name if pay.supplier else "", pay.document_number, pay.document_date, fmt_money(pay.total_amount), fmt_money(pay.balance_amount), creator_name(pay.created_by_id)])
     payments = scope_query_to_active_company(Payment.query.filter(Payment.payment_type.like("OPENING_ADVANCE%")), Payment.company_id)
     for payment in payments.all():
         party = payment.customer.name if payment.customer else payment.supplier.name if payment.supplier else ""
-        rows.append([payment.payment_type, payment.company.code, party, payment.reference_number or "", payment.payment_date, fmt_money(payment.total_amount), fmt_money(payment.unallocated_amount)])
+        rows.append([payment.payment_type, payment.company.code, party, payment.reference_number or "", payment.payment_date, fmt_money(payment.total_amount), fmt_money(payment.unallocated_amount), creator_name(payment.created_by_id)])
     return headers, rows
 
 

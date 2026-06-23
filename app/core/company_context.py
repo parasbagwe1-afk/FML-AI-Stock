@@ -74,6 +74,13 @@ def set_active_company(company_id):
 
 
 def set_active_company_for_user(user):
+    company_id = getattr(user, "company_id", None)
+    if company_id:
+        company = Company.query.filter_by(id=company_id, active=True).first()
+        if company:
+            session[ACTIVE_COMPANY_SESSION_KEY] = company.id
+            return company
+
     code = USER_COMPANY_CODES.get((getattr(user, "email", "") or "").strip().lower())
     if not code:
         return None
@@ -85,7 +92,9 @@ def set_active_company_for_user(user):
 
 
 def user_has_fixed_company(user):
-    return (getattr(user, "email", "") or "").strip().lower() in USER_COMPANY_CODES
+    return bool(getattr(user, "company_id", None)) or (
+        (getattr(user, "email", "") or "").strip().lower() in USER_COMPANY_CODES
+    )
 
 
 def user_can_view_all_companies(user):

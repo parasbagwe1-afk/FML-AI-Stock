@@ -27,6 +27,9 @@ def get_or_create(model, defaults=None, **kwargs):
 
 def seed_all(app):
     with app.app_context():
+        from app.services.schema import ensure_runtime_schema
+
+        ensure_runtime_schema()
         seed_companies()
         seed_items()
         seed_suppliers()
@@ -187,6 +190,7 @@ def seed_admin(app):
             "password_hash": "placeholder",
         },
     )
+    admin.company_id = None
     if created or admin.password_hash == "placeholder" or not admin.check_password(app.config["ADMIN_PASSWORD"]):
         admin.set_password(app.config["ADMIN_PASSWORD"])
         admin.last_login_at = None
@@ -201,20 +205,23 @@ def seed_admin(app):
 
 def seed_company_users():
     rows = [
-        ("firsttech.user", "FirstTech User", "Firsttech2026"),
-        ("adityainternational.user", "Aditya International User", "Aditya2026"),
+        ("firsttech.user", "FirstTech User", "Firsttech2026", "FML"),
+        ("adityainternational.user", "Aditya International User", "Aditya2026", "AI"),
     ]
-    for login_id, name, password in rows:
+    for login_id, name, password, company_code in rows:
+        company = Company.query.filter_by(code=company_code).one()
         user, created = get_or_create(
             User,
             email=login_id,
             defaults={
                 "name": name,
+                "company_id": company.id,
                 "role": ROLE_ADMIN,
                 "active": True,
                 "password_hash": "placeholder",
             },
         )
+        user.company_id = company.id
         if created or user.password_hash == "placeholder":
             user.set_password(password)
             user.last_login_at = None

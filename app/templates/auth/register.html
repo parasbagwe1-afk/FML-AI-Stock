@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="login-message" content="{{ login_message|default('', true)|e }}">
     <meta name="login-message-category" content="{{ login_message_category|default('info', true)|e }}">
-    <title>Company Login</title>
+    <title>Register User</title>
     <link rel="icon" href="{{ url_for('static', filename='img/fastockflow-icon.png', v=asset_version) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=asset_version) }}">
   </head>
@@ -17,34 +17,42 @@
         <div class="login-brand">
           <span class="brand-mark large logo-mark"><img src="{{ url_for('static', filename='img/fastockflow-icon.png', v=asset_version) }}" alt="FAstockFlow"></span>
           <div>
-            <h1>FAstockFlow</h1>
-            <p>Secure company workspace for FirstTech and Aditya users.</p>
+            <h1>Register User</h1>
+            <p>Create a company-specific login for stock and account entries.</p>
           </div>
         </div>
         <div class="login-company-options" role="radiogroup" aria-label="Company">
           {% for company in companies %}
             <label class="login-company-option">
-              <input name="company_id" type="radio" value="{{ company.id }}" required {% if selected_company_id == company.id|string or (not selected_company_id and loop.first) %}checked{% endif %} {% if loop.first %}autofocus{% endif %}>
+              <input name="company_id" type="radio" value="{{ company.id }}" required {% if form.get('company_id') == company.id|string or (not form.get('company_id') and loop.first) %}checked{% endif %} {% if loop.first %}autofocus{% endif %}>
               <img src="{{ url_for('static', filename=company_logo(company), v=asset_version) }}" alt="{{ company.name }}">
               <span>{{ company.name }}</span>
               <small>{{ company.code }} company workspace</small>
             </label>
           {% endfor %}
         </div>
-        <label>Login ID
-          <input name="email" type="text" value="{{ login_id }}" autocomplete="username" required>
-        </label>
-        <label>Password
-          <span class="password-wrap">
-            <input id="password" name="password" type="password" autocomplete="current-password" required>
-            <button type="button" class="icon-button" data-toggle-password="#password">Show</button>
-          </span>
-        </label>
-        <button class="primary-button full" type="submit">Login</button>
-        <div class="login-secondary-actions">
-          <a class="secondary-button center-button" href="{{ url_for('auth.register') }}">Register user</a>
-          <a class="secondary-button center-button" href="{{ url_for('auth.admin_login') }}">Owner/admin login</a>
+        <div class="login-field-grid">
+          <label>Name
+            <input name="name" type="text" value="{{ form.get('name', '') }}" autocomplete="name" required>
+          </label>
+          <label>Login ID
+            <input name="email" type="text" value="{{ form.get('email', '') }}" autocomplete="username" required>
+          </label>
+          <label>Password
+            <span class="password-wrap">
+              <input id="register_password" name="password" type="password" autocomplete="new-password" required>
+              <button type="button" class="icon-button" data-toggle-password="#register_password">Show</button>
+            </span>
+          </label>
+          <label>Confirm password
+            <span class="password-wrap">
+              <input id="register_confirm_password" name="confirm_password" type="password" autocomplete="new-password" required>
+              <button type="button" class="icon-button" data-toggle-password="#register_confirm_password">Show</button>
+            </span>
+          </label>
         </div>
+        <button class="primary-button full" type="submit">Create Login</button>
+        <a class="secondary-button full center-button" href="{{ url_for('auth.login') }}">Back to company login</a>
       </form>
     </main>
     <script src="{{ url_for('static', filename='js/app.js', v=asset_version) }}"></script>

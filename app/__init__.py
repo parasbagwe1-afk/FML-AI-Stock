@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from pathlib import Path
 
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, g, redirect, render_template, request, url_for
 from flask_login import current_user
 
 from app.config import Config
@@ -77,7 +77,7 @@ def register_template_helpers(app):
         user_has_fixed_company,
     )
     from app.core.security import can
-    from app.models import Payable, Receivable
+    from app.models import Payable, Receivable, User
 
     @app.context_processor
     def inject_helpers():
@@ -111,6 +111,18 @@ def register_template_helpers(app):
             payables = payables.count()
             return receivables + payables
 
+        def user_name(user_id):
+            if not user_id:
+                return "System"
+            cache = getattr(g, "_user_name_cache", None)
+            if cache is None:
+                cache = {}
+                g._user_name_cache = cache
+            if user_id not in cache:
+                user = db.session.get(User, int(user_id))
+                cache[user_id] = user.name if user else "Unknown user"
+            return cache[user_id]
+
         selected_company = active_company() if current_user.is_authenticated else None
         selected_theme = company_theme(selected_company)
         choices = company_choices() if current_user.is_authenticated else []
@@ -120,6 +132,7 @@ def register_template_helpers(app):
             "fmt_money": fmt_money,
             "fmt_qty": fmt_qty,
             "is_active_nav": is_active_nav,
+            "user_name": user_name,
             "due_alert_count": due_alert_count(),
             "asset_version": app.config.get("STATIC_ASSET_VERSION", "1"),
             "active_company": selected_company,
@@ -137,6 +150,9 @@ def register_cli(app):
     def init_db():
         """Create database tables."""
         db.create_all()
+        from app.services.schema import ensure_runtime_schema
+
+        ensure_runtime_schema()
         print("Database tables created.")
 
     @app.cli.command("drop-db")

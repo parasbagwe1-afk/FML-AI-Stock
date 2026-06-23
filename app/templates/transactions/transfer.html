@@ -53,7 +53,7 @@
   <section class="panel">
     <div class="panel-title"><h2>Recent Transfers</h2><a href="{{ url_for('reports.show', name='inter-company') }}">Report</a></div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Date</th><th>Reference</th><th>Perspective</th><th>From</th><th>To</th><th>FIFO value</th><th>Approved</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Date</th><th>Reference</th><th>Perspective</th><th>From</th><th>To</th><th>FIFO value</th><th>Approved</th><th>Created By</th><th>Actions</th></tr></thead>
       <tbody>
         {% for row in transfers %}
           <tr>
@@ -72,6 +72,7 @@
             <td>{{ row.to_company.code }} / {{ row.to_stock_book.name }}</td>
             <td>{{ fmt_money(row.total_fifo_value) }}</td>
             <td>{{ 'Yes' if row.mismatch_approved else 'No' }}</td>
+            <td>{{ user_name(row.created_by_id) }}</td>
             <td class="actions">
               {% if can(current_user, 'transfer', 'edit') or can(current_user, 'transfer', 'create') %}
                 <a class="table-action" href="{{ url_for('transactions.transfer_edit', transfer_id=row.id) }}">Edit</a>
@@ -85,7 +86,7 @@
             </td>
           </tr>
         {% else %}
-          <tr><td colspan="8" class="empty">No transfers yet.</td></tr>
+          <tr><td colspan="9" class="empty">No transfers yet.</td></tr>
         {% endfor %}
       </tbody>
     </table></div>

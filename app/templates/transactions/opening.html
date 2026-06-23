@@ -98,11 +98,11 @@
     <div class="panel-title"><h2>Opening Summary</h2><a href="{{ url_for('reports.show', name='opening-summary') }}">Full report</a></div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Type</th><th>Company</th><th>Party</th><th>Document</th><th>Amount</th><th>Balance</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Type</th><th>Company</th><th>Party</th><th>Document</th><th>Amount</th><th>Balance</th><th>Created By</th><th>Actions</th></tr></thead>
         <tbody>
           {% for row in opening_stock %}
             <tr>
-              <td>Stock</td><td>{{ row.company.code }}</td><td>{{ row.stock_book.name }}</td><td>{{ row.reference_number }}</td><td></td><td></td>
+              <td>Stock</td><td>{{ row.company.code }}</td><td>{{ row.stock_book.name }}</td><td>{{ row.reference_number }}</td><td></td><td></td><td>{{ user_name(row.created_by_id) }}</td>
               <td class="actions">
                 {% if can(current_user, 'opening', 'create') or can(current_user, 'opening', 'deactivate') %}
                   <a class="table-action" href="{{ url_for('transactions.opening_stock_edit', opening_id=row.id) }}">Edit</a>
@@ -116,7 +116,7 @@
           {% endfor %}
           {% for row in receivables %}
             <tr>
-              <td>Receivable</td><td>{{ row.company.code }}</td><td>{{ row.customer.name }}</td><td>{{ row.document_number }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.balance_amount) }}</td>
+              <td>Receivable</td><td>{{ row.company.code }}</td><td>{{ row.customer.name }}</td><td>{{ row.document_number }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.balance_amount) }}</td><td>{{ user_name(row.created_by_id) }}</td>
               <td class="actions">
                 {% if can(current_user, 'opening', 'create') or can(current_user, 'opening', 'deactivate') %}
                   <a class="table-action" href="{{ url_for('transactions.opening_receivable_edit', receivable_id=row.id) }}">Edit</a>
@@ -130,7 +130,7 @@
           {% endfor %}
           {% for row in payables %}
             <tr>
-              <td>Payable</td><td>{{ row.company.code }}</td><td>{{ row.supplier.name }}</td><td>{{ row.document_number }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.balance_amount) }}</td>
+              <td>Payable</td><td>{{ row.company.code }}</td><td>{{ row.supplier.name }}</td><td>{{ row.document_number }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.balance_amount) }}</td><td>{{ user_name(row.created_by_id) }}</td>
               <td class="actions">
                 {% if can(current_user, 'opening', 'create') or can(current_user, 'opening', 'deactivate') %}
                   <a class="table-action" href="{{ url_for('transactions.opening_payable_edit', payable_id=row.id) }}">Edit</a>
@@ -144,7 +144,7 @@
           {% endfor %}
           {% for row in advances %}
             <tr>
-              <td>{{ row.payment_type }}</td><td>{{ row.company.code }}</td><td>{{ row.customer.name if row.customer else row.supplier.name }}</td><td>{{ row.reference_number or '' }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.unallocated_amount) }}</td>
+              <td>{{ row.payment_type }}</td><td>{{ row.company.code }}</td><td>{{ row.customer.name if row.customer else row.supplier.name }}</td><td>{{ row.reference_number or '' }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.unallocated_amount) }}</td><td>{{ user_name(row.created_by_id) }}</td>
               <td class="actions">
                 {% if can(current_user, 'opening', 'create') or can(current_user, 'opening', 'deactivate') %}
                   <a class="table-action" href="{{ url_for('transactions.opening_advance_edit', payment_id=row.id) }}">Edit</a>

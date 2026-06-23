@@ -31,6 +31,9 @@ from app.services.transactions import (
     create_purchase,
     create_sale,
     create_transfer,
+    delete_opening_advance,
+    delete_opening_payable,
+    delete_opening_receivable,
     pending_transfer_summary,
     update_purchase_header,
     update_purchase_lines,
@@ -337,6 +340,63 @@ def opening_stock_delete(opening_id):
         void_opening_stock(opening, current_user)
         db.session.commit()
         flash("Opening stock deleted and stock reversed.", "success")
+    except Exception as exc:
+        db.session.rollback()
+        flash(str(exc), "danger")
+    return redirect(url_for("transactions.opening"))
+
+
+@bp.route("/opening/receivable/<int:receivable_id>/delete", methods=["POST"])
+@login_required
+def opening_receivable_delete(receivable_id):
+    if not (can(current_user, "opening", "create") or can(current_user, "opening", "deactivate")):
+        abort(403)
+    receivable = db.session.get(Receivable, receivable_id)
+    if not receivable:
+        flash("Opening receivable not found.", "danger")
+        return redirect(url_for("transactions.opening"))
+    try:
+        delete_opening_receivable(receivable, current_user)
+        db.session.commit()
+        flash("Opening receivable deleted.", "success")
+    except Exception as exc:
+        db.session.rollback()
+        flash(str(exc), "danger")
+    return redirect(url_for("transactions.opening"))
+
+
+@bp.route("/opening/payable/<int:payable_id>/delete", methods=["POST"])
+@login_required
+def opening_payable_delete(payable_id):
+    if not (can(current_user, "opening", "create") or can(current_user, "opening", "deactivate")):
+        abort(403)
+    payable = db.session.get(Payable, payable_id)
+    if not payable:
+        flash("Opening payable not found.", "danger")
+        return redirect(url_for("transactions.opening"))
+    try:
+        delete_opening_payable(payable, current_user)
+        db.session.commit()
+        flash("Opening payable deleted.", "success")
+    except Exception as exc:
+        db.session.rollback()
+        flash(str(exc), "danger")
+    return redirect(url_for("transactions.opening"))
+
+
+@bp.route("/opening/advance/<int:payment_id>/delete", methods=["POST"])
+@login_required
+def opening_advance_delete(payment_id):
+    if not (can(current_user, "opening", "create") or can(current_user, "opening", "deactivate")):
+        abort(403)
+    payment = db.session.get(Payment, payment_id)
+    if not payment:
+        flash("Opening advance not found.", "danger")
+        return redirect(url_for("transactions.opening"))
+    try:
+        delete_opening_advance(payment, current_user)
+        db.session.commit()
+        flash("Opening advance deleted.", "success")
     except Exception as exc:
         db.session.rollback()
         flash(str(exc), "danger")

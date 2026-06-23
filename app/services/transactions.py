@@ -1609,6 +1609,40 @@ def void_opening_stock(opening, user):
     return opening
 
 
+def delete_opening_receivable(receivable, user):
+    if not receivable.is_opening or receivable.source_type != "OPENING_RECEIVABLE":
+        raise ValueError("Only opening receivables can be deleted from opening balances.")
+    if receivable.paid_amount:
+        raise ValueError("Opening receivable cannot be deleted after receipt allocation.")
+    reference = receivable.document_number
+    db.session.delete(receivable)
+    audit("delete", "OpeningReceivable", receivable.id, reference, user=user)
+    return receivable
+
+
+def delete_opening_payable(payable, user):
+    if not payable.is_opening or payable.source_type != "OPENING_PAYABLE":
+        raise ValueError("Only opening payables can be deleted from opening balances.")
+    if payable.paid_amount:
+        raise ValueError("Opening payable cannot be deleted after payment allocation.")
+    reference = payable.document_number
+    db.session.delete(payable)
+    audit("delete", "OpeningPayable", payable.id, reference, user=user)
+    return payable
+
+
+def delete_opening_advance(payment, user):
+    if not payment.payment_type.startswith("OPENING_ADVANCE"):
+        raise ValueError("Only opening advances can be deleted from opening balances.")
+    if payment.allocated_amount:
+        raise ValueError("Opening advance cannot be deleted after allocation.")
+    reference = payment.reference_number or str(payment.id)
+    PaymentAllocation.query.filter_by(payment_id=payment.id).delete(synchronize_session=False)
+    db.session.delete(payment)
+    audit("delete", "OpeningAdvance", payment.id, reference, user=user)
+    return payment
+
+
 def create_opening_receivable(data, user):
     company = db.session.get(Company, int(data.get("company_id") or 0))
     if not company or not company.active:

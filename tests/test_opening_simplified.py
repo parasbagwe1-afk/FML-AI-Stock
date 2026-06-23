@@ -1,4 +1,13 @@
-from app.models import FIFOLayer, InterCompanyLedgerEntry, InterCompanyTransfer, OpeningStock, StockLedgerEntry
+from app.models import (
+    FIFOLayer,
+    InterCompanyLedgerEntry,
+    InterCompanyTransfer,
+    OpeningStock,
+    Payable,
+    Payment,
+    Receivable,
+    StockLedgerEntry,
+)
 from tests.test_fifo_workflows import ids
 from tests.test_navigation import login
 
@@ -139,3 +148,91 @@ def test_opening_pending_stock_can_be_negative(client, app):
         assert transfer.lines[0].quantity == -3
         assert transfer.lines[0].fifo_value == 0
         assert ledger.quantity == -3
+
+
+def test_opening_summary_can_delete_receivable_payable_and_advance(client, app):
+    with app.app_context():
+        data = ids()
+        company_id = data["ai"].id
+        customer_id = data["customer"].id
+        supplier_id = data["supplier"].id
+
+    login(client)
+    client.post(
+        "/transactions/opening/receivable",
+        data={
+            "company_id": company_id,
+            "customer_id": customer_id,
+            "sale_type": "GST",
+            "reference_number": "OPEN-REC-DELETE",
+            "invoice_date": "2026-06-22",
+            "due_date": "2026-06-30",
+            "pending_amount": "78440",
+        },
+        follow_redirects=True,
+    )
+    client.post(
+        "/transactions/opening/payable",
+        data={
+            "company_id": company_id,
+            "supplier_id": supplier_id,
+            "purchase_type": "GST",
+            "reference_number": "OPEN-PAY-DELETE",
+            "bill_date": "2026-06-22",
+            "due_date": "2026-06-30",
+            "pending_amount": "12500",
+        },
+        follow_redirects=True,
+    )
+    client.post(
+        "/transactions/opening/advance-received",
+        data={
+            "company_id": company_id,
+            "customer_id": customer_id,
+            "payment_date": "2026-06-22",
+            "mode": "CASH",
+            "reference_number": "OPEN-ADV-DELETE",
+            "amount": "5000",
+        },
+        follow_redirects=True,
+    )
+
+    response = client.get("/transactions/opening")
+    html = response.get_data(as_text=True)
+    assert "/transactions/opening/receivable/" in html
+    assert "/transactions/opening/payable/" in html
+    assert "/transactions/opening/advance/" in html
+
+    with app.app_context():
+        receivable = Receivable.query.filter_by(document_number="OPEN-REC-DELETE").one()
+        payable = Payable.query.filter_by(document_number="OPEN-PAY-DELETE").one()
+        payment = Payment.query.filter_by(reference_number="OPEN-ADV-DELETE").one()
+        receivable_id = receivable.id
+        payable_id = payable.id
+        payment_id = payment.id
+
+    response = client.post(
+        f"/transactions/opening/receivable/{receivable_id}/delete",
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Opening receivable deleted." in response.data
+
+    response = client.post(
+        f"/transactions/opening/payable/{payable_id}/delete",
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Opening payable deleted." in response.data
+
+    response = client.post(
+        f"/transactions/opening/advance/{payment_id}/delete",
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Opening advance deleted." in response.data
+
+    with app.app_context():
+        assert Receivable.query.filter_by(document_number="OPEN-REC-DELETE").count() == 0
+        assert Payable.query.filter_by(document_number="OPEN-PAY-DELETE").count() == 0
+        assert Payment.query.filter_by(reference_number="OPEN-ADV-DELETE").count() == 0

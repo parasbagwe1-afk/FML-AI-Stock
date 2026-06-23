@@ -114,13 +114,43 @@
             </tr>
           {% endfor %}
           {% for row in receivables %}
-            <tr><td>Receivable</td><td>{{ row.company.code }}</td><td>{{ row.customer.name }}</td><td>{{ row.document_number }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.balance_amount) }}</td><td></td></tr>
+            <tr>
+              <td>Receivable</td><td>{{ row.company.code }}</td><td>{{ row.customer.name }}</td><td>{{ row.document_number }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.balance_amount) }}</td>
+              <td class="actions">
+                {% if can(current_user, 'opening', 'create') or can(current_user, 'opening', 'deactivate') %}
+                  <form method="post" action="{{ url_for('transactions.opening_receivable_delete', receivable_id=row.id) }}" data-confirm="Delete this opening receivable?">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="link-button" type="submit">Delete</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
           {% endfor %}
           {% for row in payables %}
-            <tr><td>Payable</td><td>{{ row.company.code }}</td><td>{{ row.supplier.name }}</td><td>{{ row.document_number }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.balance_amount) }}</td><td></td></tr>
+            <tr>
+              <td>Payable</td><td>{{ row.company.code }}</td><td>{{ row.supplier.name }}</td><td>{{ row.document_number }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.balance_amount) }}</td>
+              <td class="actions">
+                {% if can(current_user, 'opening', 'create') or can(current_user, 'opening', 'deactivate') %}
+                  <form method="post" action="{{ url_for('transactions.opening_payable_delete', payable_id=row.id) }}" data-confirm="Delete this opening payable?">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="link-button" type="submit">Delete</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
           {% endfor %}
           {% for row in advances %}
-            <tr><td>{{ row.payment_type }}</td><td>{{ row.company.code }}</td><td>{{ row.customer.name if row.customer else row.supplier.name }}</td><td>{{ row.reference_number or '' }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.unallocated_amount) }}</td><td></td></tr>
+            <tr>
+              <td>{{ row.payment_type }}</td><td>{{ row.company.code }}</td><td>{{ row.customer.name if row.customer else row.supplier.name }}</td><td>{{ row.reference_number or '' }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.unallocated_amount) }}</td>
+              <td class="actions">
+                {% if can(current_user, 'opening', 'create') or can(current_user, 'opening', 'deactivate') %}
+                  <form method="post" action="{{ url_for('transactions.opening_advance_delete', payment_id=row.id) }}" data-confirm="Delete this opening advance?">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="link-button" type="submit">Delete</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
           {% endfor %}
         </tbody>
       </table>

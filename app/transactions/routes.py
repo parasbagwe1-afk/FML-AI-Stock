@@ -49,10 +49,16 @@ from app.services.transactions import (
 bp = Blueprint("transactions", __name__, url_prefix="/transactions")
 
 
-def options():
+def options(scope_to_active_company=False):
+    company = active_company() if scope_to_active_company else None
+    companies = Company.query.filter_by(active=True)
+    stock_books = StockBook.query.filter_by(active=True)
+    if company:
+        companies = companies.filter(Company.id == company.id)
+        stock_books = stock_books.filter(StockBook.company_id == company.id)
     return {
-        "companies": Company.query.filter_by(active=True).order_by(Company.code).all(),
-        "stock_books": StockBook.query.filter_by(active=True).order_by(StockBook.code).all(),
+        "companies": companies.order_by(Company.code).all(),
+        "stock_books": stock_books.order_by(StockBook.code).all(),
         "items": Item.query.filter_by(active=True).order_by(Item.code).all(),
         "suppliers": Supplier.query.filter_by(active=True).order_by(Supplier.code).all(),
         "customers": Customer.query.filter_by(active=True).order_by(Customer.code).all(),
@@ -63,6 +69,27 @@ def options():
 def active_company_id():
     company = active_company()
     return company.id if company else None
+
+
+def require_active_company_value(company_id):
+    company = active_company()
+    if company and str(company_id or "") != str(company.id):
+        raise ValueError("This login can record transactions only for the active company.")
+
+
+def require_active_company_document(*company_ids):
+    company = active_company()
+    if company and company.id not in {int(value) for value in company_ids if value}:
+        abort(403)
+
+
+def require_transfer_scope(data):
+    company = active_company()
+    if not company:
+        return
+    selected = {str(data.get("from_company_id") or ""), str(data.get("to_company_id") or "")}
+    if str(company.id) not in selected:
+        raise ValueError("Transfers must include the active company.")
 
 
 @bp.route("/reference/<kind>")
@@ -78,6 +105,7 @@ def purchase():
     if request.method == "POST":
         require_permission("purchase", "create")(lambda: None)()
         try:
+            require_active_company_value(request.form.get("company_id"))
             purchase = create_purchase(request.form, item_lines_from_form(request.form), current_user)
             db.session.commit()
             flash(f"Purchase {purchase.bill_number} saved.", "success")
@@ -90,7 +118,7 @@ def purchase():
     if company_id:
         purchases = purchases.filter(Purchase.company_id == company_id)
     purchases = purchases.order_by(Purchase.bill_date.desc(), Purchase.id.desc()).limit(20).all()
-    return render_template("transactions/purchase.html", purchases=purchases, **options())
+    return render_template("transactions/purchase.html", purchases=purchases, **options(scope_to_active_company=True))
 
 
 @bp.route("/purchase/<int:purchase_id>/edit", methods=["GET", "POST"])
@@ -102,8 +130,10 @@ def purchase_edit(purchase_id):
     if not purchase:
         flash("Purchase not found.", "danger")
         return redirect(url_for("transactions.purchase"))
+    require_active_company_document(purchase.company_id)
     if request.method == "POST":
         try:
+            require_active_company_value(request.form.get("company_id") or purchase.company_id)
             update_purchase_header(purchase, request.form, current_user)
             update_purchase_lines(purchase, item_lines_from_form(request.form), request.form, current_user)
             db.session.commit()
@@ -112,7 +142,7 @@ def purchase_edit(purchase_id):
         except Exception as exc:
             db.session.rollback()
             flash(str(exc), "danger")
-    return render_template("transactions/purchase_edit.html", purchase=purchase, **options())
+    return render_template("transactions/purchase_edit.html", purchase=purchase, **options(scope_to_active_company=True))
 
 
 @bp.route("/purchase/<int:purchase_id>/delete", methods=["POST"])
@@ -124,6 +154,7 @@ def purchase_delete(purchase_id):
     if not purchase:
         flash("Purchase not found.", "danger")
         return redirect(url_for("transactions.purchase"))
+    require_active_company_document(purchase.company_id)
     try:
         void_purchase(purchase, current_user)
         db.session.commit()
@@ -141,6 +172,7 @@ def sale():
     if request.method == "POST":
         require_permission("sale", "create")(lambda: None)()
         try:
+            require_active_company_value(request.form.get("company_id"))
             sale = create_sale(request.form, item_lines_from_form(request.form), current_user)
             db.session.commit()
             flash(f"Sale {sale.invoice_number} saved.", "success")
@@ -153,7 +185,7 @@ def sale():
     if company_id:
         sales = sales.filter(Sale.company_id == company_id)
     sales = sales.order_by(Sale.invoice_date.desc(), Sale.id.desc()).limit(20).all()
-    return render_template("transactions/sale.html", sales=sales, **options())
+    return render_template("transactions/sale.html", sales=sales, **options(scope_to_active_company=True))
 
 
 @bp.route("/sale/<int:sale_id>/edit", methods=["GET", "POST"])
@@ -165,8 +197,10 @@ def sale_edit(sale_id):
     if not sale:
         flash("Sale not found.", "danger")
         return redirect(url_for("transactions.sale"))
+    require_active_company_document(sale.company_id)
     if request.method == "POST":
         try:
+            require_active_company_value(request.form.get("company_id") or sale.company_id)
             update_sale_header(sale, request.form, current_user)
             update_sale_lines(sale, item_lines_from_form(request.form), current_user)
             db.session.commit()
@@ -175,7 +209,7 @@ def sale_edit(sale_id):
         except Exception as exc:
             db.session.rollback()
             flash(str(exc), "danger")
-    return render_template("transactions/sale_edit.html", sale=sale, **options())
+    return render_template("transactions/sale_edit.html", sale=sale, **options(scope_to_active_company=True))
 
 
 @bp.route("/sale/<int:sale_id>/delete", methods=["POST"])
@@ -187,6 +221,7 @@ def sale_delete(sale_id):
     if not sale:
         flash("Sale not found.", "danger")
         return redirect(url_for("transactions.sale"))
+    require_active_company_document(sale.company_id)
     try:
         void_sale(sale, current_user)
         db.session.commit()
@@ -204,6 +239,7 @@ def transfer():
     if request.method == "POST":
         require_permission("transfer", "create")(lambda: None)()
         try:
+            require_transfer_scope(request.form)
             transfer = create_transfer(request.form, transfer_lines_from_form(request.form), current_user)
             db.session.commit()
             flash(f"Transfer {transfer.reference_number} saved.", "success")
@@ -238,8 +274,10 @@ def transfer_edit(transfer_id):
     if not transfer:
         flash("Transfer not found.", "danger")
         return redirect(url_for("transactions.transfer"))
+    require_active_company_document(transfer.from_company_id, transfer.to_company_id)
     if request.method == "POST":
         try:
+            require_active_company_document(transfer.from_company_id, transfer.to_company_id)
             update_transfer_header(transfer, request.form, current_user)
             db.session.commit()
             flash(f"Transfer {transfer.reference_number} updated.", "success")
@@ -259,6 +297,7 @@ def transfer_delete(transfer_id):
     if not transfer:
         flash("Transfer not found.", "danger")
         return redirect(url_for("transactions.transfer"))
+    require_active_company_document(transfer.from_company_id, transfer.to_company_id)
     try:
         void_transfer(transfer, current_user)
         db.session.commit()
@@ -299,21 +338,27 @@ def opening():
 def opening_save(section):
     try:
         if section == "stock":
+            require_active_company_value(request.form.get("company_id"))
             record = create_opening_stock(request.form, item_lines_from_form(request.form), current_user)
             message = f"Opening stock {record.reference_number} saved."
         elif section == "receivable":
+            require_active_company_value(request.form.get("company_id"))
             record = create_opening_receivable(request.form, current_user)
             message = f"Opening receivable {record.document_number} saved."
         elif section == "pending-stock":
+            require_transfer_scope(request.form)
             record = create_opening_pending_stock(request.form, item_lines_from_form(request.form), current_user)
             message = f"Opening pending stock {record.reference_number} saved."
         elif section == "payable":
+            require_active_company_value(request.form.get("company_id"))
             record = create_opening_payable(request.form, current_user)
             message = f"Opening payable {record.document_number} saved."
         elif section == "advance-received":
+            require_active_company_value(request.form.get("company_id"))
             record = create_opening_advance_received(request.form, current_user)
             message = "Opening advance received saved."
         elif section == "advance-paid":
+            require_active_company_value(request.form.get("company_id"))
             record = create_opening_advance_paid(request.form, current_user)
             message = "Opening advance paid saved."
         else:
@@ -336,6 +381,7 @@ def opening_stock_delete(opening_id):
     if not opening:
         flash("Opening stock not found.", "danger")
         return redirect(url_for("transactions.opening"))
+    require_active_company_document(opening.company_id)
     try:
         void_opening_stock(opening, current_user)
         db.session.commit()

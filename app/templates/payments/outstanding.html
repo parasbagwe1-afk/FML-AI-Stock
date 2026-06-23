@@ -5,10 +5,14 @@
   <section class="panel">
     <form method="get" class="toolbar">
       <select name="company_id">
-        <option value="">All companies</option>
-        {% for company in companies %}
-          <option value="{{ company.id }}" {% if request.args.get('company_id') == company.id|string %}selected{% endif %}>{{ company.code }}</option>
-        {% endfor %}
+        {% if active_company %}
+          <option value="{{ active_company.id }}" selected>{{ active_company.code }}</option>
+        {% else %}
+          <option value="">All companies</option>
+          {% for company in companies %}
+            <option value="{{ company.id }}" {% if request.args.get('company_id') == company.id|string %}selected{% endif %}>{{ company.code }}</option>
+          {% endfor %}
+        {% endif %}
       </select>
       <select name="status">
         <option value="">All statuses</option>

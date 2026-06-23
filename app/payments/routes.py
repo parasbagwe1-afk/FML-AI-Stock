@@ -12,19 +12,27 @@ bp = Blueprint("payments", __name__, url_prefix="/finance")
 
 def finance_options():
     company = active_company()
+    companies = Company.query.filter_by(active=True)
     receivables = Receivable.query.filter(Receivable.balance_amount > 0)
     payables = Payable.query.filter(Payable.balance_amount > 0)
     if company:
+        companies = companies.filter(Company.id == company.id)
         receivables = receivables.filter(Receivable.company_id == company.id)
         payables = payables.filter(Payable.company_id == company.id)
     return {
-        "companies": Company.query.filter_by(active=True).order_by(Company.code).all(),
+        "companies": companies.order_by(Company.code).all(),
         "customers": Customer.query.filter_by(active=True).order_by(Customer.code).all(),
         "suppliers": Supplier.query.filter_by(active=True).order_by(Supplier.code).all(),
         "payment_modes": PaymentMode.query.filter_by(active=True).order_by(PaymentMode.code).all(),
         "receivables": receivables.order_by(Receivable.due_date, Receivable.document_number).all(),
         "payables": payables.order_by(Payable.due_date, Payable.document_number).all(),
     }
+
+
+def require_active_company_value(company_id):
+    company = active_company()
+    if company and str(company_id or "") != str(company.id):
+        raise ValueError("This login can record payments only for the active company.")
 
 
 @bp.route("/payments", methods=["GET"])
@@ -44,6 +52,7 @@ def index():
 @require_permission("payments", "create")
 def customer_receipt():
     try:
+        require_active_company_value(request.form.get("company_id"))
         payment = create_customer_receipt(request.form, current_user)
         db.session.commit()
         flash(f"Customer receipt for {payment.total_amount} saved.", "success")
@@ -58,6 +67,7 @@ def customer_receipt():
 @require_permission("payments", "create")
 def supplier_payment():
     try:
+        require_active_company_value(request.form.get("company_id"))
         payment = create_supplier_payment(request.form, current_user)
         db.session.commit()
         flash(f"Supplier payment for {payment.total_amount} saved.", "success")
@@ -72,7 +82,7 @@ def supplier_payment():
 @require_permission("outstanding", "view")
 def outstanding():
     company = active_company()
-    company_id = request.args.get("company_id") or (company.id if company else None)
+    company_id = company.id if company else request.args.get("company_id")
     status = request.args.get("status")
     receivables = Receivable.query
     payables = Payable.query
@@ -84,11 +94,16 @@ def outstanding():
         payables = payables.filter_by(payment_status=status)
     receivables = receivables.order_by(Receivable.due_date, Receivable.document_date).all()
     payables = payables.order_by(Payable.due_date, Payable.document_date).all()
-    advances = Payment.query.filter(Payment.unallocated_amount > 0).order_by(Payment.payment_date.desc()).all()
+    advances = Payment.query.filter(Payment.unallocated_amount > 0)
+    companies = Company.query.filter_by(active=True)
+    if company:
+        advances = advances.filter(Payment.company_id == company.id)
+        companies = companies.filter(Company.id == company.id)
+    advances = advances.order_by(Payment.payment_date.desc()).all()
     return render_template(
         "payments/outstanding.html",
         receivables=receivables,
         payables=payables,
         advances=advances,
-        companies=Company.query.filter_by(active=True).order_by(Company.code).all(),
+        companies=companies.order_by(Company.code).all(),
     )

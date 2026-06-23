@@ -107,3 +107,15 @@ def test_topbar_includes_music_controls(client):
     assert 'data-music-toggle' in html
     assert 'data-music-volume' in html
     assert 'aria-label="Background music volume"' in html
+
+
+def test_missing_page_renders_when_company_context_is_absent(client):
+    login(client)
+    with client.session_transaction() as session:
+        session.pop(ACTIVE_COMPANY_SESSION_KEY, None)
+
+    response = client.get("/missing-page")
+
+    assert response.status_code == 404
+    assert b"Not found" in response.data
+    assert b"fastockflow-icon.png" in response.data

@@ -4,6 +4,7 @@ from decimal import Decimal
 from flask import Blueprint, render_template
 from flask_login import login_required
 
+from app.core.company_context import active_company
 from app.core.security import require_permission
 from app.extensions import db
 from app.models import (
@@ -24,7 +25,12 @@ bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 @login_required
 @require_permission("dashboard", "view")
 def index():
-    stock_books = StockBook.query.filter_by(active=True).order_by(StockBook.code).all()
+    company = active_company()
+    company_id = company.id if company else None
+    stock_books_query = StockBook.query.filter_by(active=True)
+    if company_id:
+        stock_books_query = stock_books_query.filter(StockBook.company_id == company_id)
+    stock_books = stock_books_query.order_by(StockBook.code).all()
     items = Item.query.filter_by(active=True).order_by(Item.code).all()
     stock_cards = []
     for book in stock_books:
@@ -50,14 +56,19 @@ def index():
         .join(Company, Sale.company_id == Company.id)
         .join(StockBook, Sale.stock_book_id == StockBook.id)
         .filter(Sale.invoice_date >= month_start, Sale.is_void.is_(False))
-        .group_by(Company.code, StockBook.book_type)
-        .all()
     )
-    receivable_total = db.session.query(db.func.coalesce(db.func.sum(Receivable.balance_amount), 0)).filter(Receivable.balance_amount > 0).scalar()
-    payable_total = db.session.query(db.func.coalesce(db.func.sum(Payable.balance_amount), 0)).filter(Payable.balance_amount > 0).scalar()
-    overdue_receivables = Receivable.query.filter(Receivable.balance_amount > 0, Receivable.due_date < today).order_by(Receivable.due_date).limit(8).all()
-    overdue_payables = Payable.query.filter(Payable.balance_amount > 0, Payable.due_date < today).order_by(Payable.due_date).limit(8).all()
-    upcoming_count = Receivable.query.filter(Receivable.balance_amount > 0, Receivable.due_date <= today + timedelta(days=7)).count()
+    receivables = Receivable.query.filter(Receivable.balance_amount > 0)
+    payables = Payable.query.filter(Payable.balance_amount > 0)
+    if company_id:
+        sales_summary = sales_summary.filter(Sale.company_id == company_id)
+        receivables = receivables.filter(Receivable.company_id == company_id)
+        payables = payables.filter(Payable.company_id == company_id)
+    sales_summary = sales_summary.group_by(Company.code, StockBook.book_type).all()
+    receivable_total = receivables.with_entities(db.func.coalesce(db.func.sum(Receivable.balance_amount), 0)).scalar()
+    payable_total = payables.with_entities(db.func.coalesce(db.func.sum(Payable.balance_amount), 0)).scalar()
+    overdue_receivables = receivables.filter(Receivable.due_date < today).order_by(Receivable.due_date).limit(8).all()
+    overdue_payables = payables.filter(Payable.due_date < today).order_by(Payable.due_date).limit(8).all()
+    upcoming_count = receivables.filter(Receivable.due_date <= today + timedelta(days=7)).count()
     low_stock = []
     for item in items:
         for book in stock_books:
@@ -66,8 +77,13 @@ def index():
             )
             if quantity <= item.minimum_stock:
                 low_stock.append({"item": item, "book": book, "quantity": quantity})
+    pending_rows = pending_transfer_summary(today)
+    if company_id:
+        pending_rows = [
+            row for row in pending_rows if row["owner"].id == company_id or row["user"].id == company_id
+        ]
     inter_company_pending = sum(
-        (row["pending"] for row in pending_transfer_summary(today)),
+        (row["pending"] for row in pending_rows),
         Decimal("0.000"),
     )
     return render_template(

@@ -236,14 +236,15 @@ def test_sidebar_company_names_switch_company_context(client):
     assert 'FirstTech Machine LLP</button>' not in html
 
 
-def test_topbar_includes_music_controls(client):
+def test_topbar_omits_background_music_controls(client):
     login(client)
     response = client.get("/dashboard/")
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert 'data-music-toggle' in html
-    assert 'data-music-volume' in html
-    assert 'aria-label="Background music volume"' in html
+    assert 'data-music-toggle' not in html
+    assert 'data-music-volume' not in html
+    assert 'aria-label="Background music volume"' not in html
+    assert 'aria-label="Due alerts"' in html
 
 
 def test_missing_page_renders_when_company_context_is_absent(client):

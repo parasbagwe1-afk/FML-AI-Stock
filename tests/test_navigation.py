@@ -56,7 +56,7 @@ def test_fixed_company_login_cannot_switch_company(client):
 
 
 def test_admin_login_is_not_a_fastockflow_login(client):
-    response = login(client, "admin@fastockflow.local", "ChangeMe123!")
+    response = login(client, "admin@fastockflow.local", "Abhijeet2026")
     assert response.status_code == 200
     assert b"Use the FirstTech or Aditya company login." in response.data
     assert b"Company Login" in response.data
@@ -73,7 +73,7 @@ def test_company_login_shows_invalid_password_message(client):
 def test_owner_admin_login_opens_combined_dashboard(client):
     response = client.post(
         "/admin/login",
-        data={"email": "admin@fastockflow.local", "password": "ChangeMe123!"},
+        data={"email": "admin@fastockflow.local", "password": "Abhijeet2026"},
         follow_redirects=True,
     )
     assert response.status_code == 200

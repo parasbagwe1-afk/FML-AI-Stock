@@ -3,20 +3,26 @@
 {% block page_subtitle %}{{ config.description }}{% endblock %}
 {% block content %}
   <section class="panel">
-    <form class="toolbar" method="get">
-      <input name="q" placeholder="Search" value="{{ request.args.get('q','') }}">
+    <form class="toolbar" method="get" data-live-search-form>
+      <input name="q" placeholder="Search" value="{{ request.args.get('q','') }}" list="{{ kind }}_suggestions" autocomplete="off" data-live-search data-live-target="#{{ kind }}_table">
+      <datalist id="{{ kind }}_suggestions">
+        {% for record in records %}
+          <option value="{{ record.code if record.code is defined else record.name }}">
+          {% if record.name is defined %}<option value="{{ record.name }}">{% endif %}
+        {% endfor %}
+      </datalist>
       <select name="active">
         <option value="active" {% if request.args.get('active','active') == 'active' %}selected{% endif %}>Active</option>
         <option value="inactive" {% if request.args.get('active') == 'inactive' %}selected{% endif %}>Inactive</option>
         <option value="all" {% if request.args.get('active') == 'all' %}selected{% endif %}>All</option>
       </select>
-      <button class="secondary-button" type="submit">Filter</button>
+      <button class="secondary-button" type="submit" data-live-find>Find</button>
       {% if can(current_user, config.module, 'create') %}
         <a class="primary-button" href="{{ url_for('masters.create_record', kind=kind) }}">Add</a>
       {% endif %}
     </form>
     <div class="table-wrap">
-      <table>
+      <table id="{{ kind }}_table">
         <thead>
           <tr>
             {% for column in config.columns %}<th>{{ column|replace('_',' ')|title }}</th>{% endfor %}
@@ -52,6 +58,7 @@
           {% else %}
             <tr><td colspan="{{ config.columns|length + 1 }}" class="empty">No records found.</td></tr>
           {% endfor %}
+          <tr class="empty live-empty" data-live-empty hidden><td colspan="{{ config.columns|length + 1 }}">No matching records.</td></tr>
         </tbody>
       </table>
     </div>

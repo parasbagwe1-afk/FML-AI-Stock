@@ -84,6 +84,7 @@ def outstanding():
     company = active_company()
     company_id = company.id if company else request.args.get("company_id")
     status = request.args.get("status")
+    search = (request.args.get("q") or "").strip()
     receivables = Receivable.query
     payables = Payable.query
     if company_id:
@@ -92,6 +93,22 @@ def outstanding():
     if status:
         receivables = receivables.filter_by(payment_status=status)
         payables = payables.filter_by(payment_status=status)
+    if search:
+        pattern = f"%{search}%"
+        receivables = receivables.outerjoin(Customer, Receivable.customer_id == Customer.id).filter(
+            db.or_(
+                Receivable.document_number.ilike(pattern),
+                Customer.code.ilike(pattern),
+                Customer.name.ilike(pattern),
+            )
+        )
+        payables = payables.outerjoin(Supplier, Payable.supplier_id == Supplier.id).filter(
+            db.or_(
+                Payable.document_number.ilike(pattern),
+                Supplier.code.ilike(pattern),
+                Supplier.name.ilike(pattern),
+            )
+        )
     receivables = receivables.order_by(Receivable.due_date, Receivable.document_date).all()
     payables = payables.order_by(Payable.due_date, Payable.document_date).all()
     advances = Payment.query.filter(Payment.unallocated_amount > 0)
@@ -99,6 +116,21 @@ def outstanding():
     if company:
         advances = advances.filter(Payment.company_id == company.id)
         companies = companies.filter(Company.id == company.id)
+    if search:
+        pattern = f"%{search}%"
+        advances = advances.outerjoin(Customer, Payment.customer_id == Customer.id).outerjoin(
+            Supplier, Payment.supplier_id == Supplier.id
+        ).filter(
+            db.or_(
+                Payment.reference_number.ilike(pattern),
+                Payment.payment_type.ilike(pattern),
+                Payment.mode.ilike(pattern),
+                Customer.code.ilike(pattern),
+                Customer.name.ilike(pattern),
+                Supplier.code.ilike(pattern),
+                Supplier.name.ilike(pattern),
+            )
+        )
     advances = advances.order_by(Payment.payment_date.desc()).all()
     return render_template(
         "payments/outstanding.html",

@@ -6,8 +6,8 @@
     <meta name="login-message" content="{{ login_message|default('', true)|e }}">
     <meta name="login-message-category" content="{{ login_message_category|default('info', true)|e }}">
     <title>Company Login</title>
-    <link rel="icon" href="/static/img/fastockflow-icon.png?v=20260623-1">
-    <link rel="stylesheet" href="/static/css/app.css?v=20260623-1">
+    <link rel="icon" href="/static/img/fastockflow-icon.png?v=20260623-2">
+    <link rel="stylesheet" href="/static/css/app.css?v=20260623-2">
   </head>
   <body>
     <main class="login-page">
@@ -15,7 +15,7 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="flash login-message" data-login-message hidden></div>
         <div class="login-brand">
-          <span class="brand-mark large logo-mark"><img src="/static/img/fastockflow-icon.png?v=20260623-1" alt="FAstockFlow"></span>
+          <span class="brand-mark large logo-mark"><img src="/static/img/fastockflow-icon.png?v=20260623-2" alt="FAstockFlow"></span>
           <div>
             <h1>FAstockFlow</h1>
             <p>Company login for FirstTech and Aditya users.</p>
@@ -24,13 +24,13 @@
         <div class="login-company-options" role="radiogroup" aria-label="Company login">
           <label class="login-company-option">
             <input name="email" type="radio" value="firsttech.user" required autofocus>
-            <img src="/static/img/firsttech-logo.jpg?v=20260623-1" alt="FirstTech Machine LLP">
+            <img src="/static/img/firsttech-logo.jpg?v=20260623-2" alt="FirstTech Machine LLP">
             <span>FirstTech Machine LLP</span>
             <small>Login ID: firsttech.user</small>
           </label>
           <label class="login-company-option">
             <input name="email" type="radio" value="adityainternational.user" required>
-            <img src="/static/img/aditya-logo.jpg?v=20260623-1" alt="Aditya International">
+            <img src="/static/img/aditya-logo.jpg?v=20260623-2" alt="Aditya International">
             <span>Aditya International</span>
             <small>Login ID: Adityainternational.user</small>
           </label>
@@ -45,7 +45,7 @@
         <a class="secondary-button full center-button" href="/admin/login">Owner/admin login</a>
       </form>
     </main>
-    <script src="/static/js/app.js?v=20260623-1"></script>
+    <script src="/static/js/app.js?v=20260623-2"></script>
     <script>
       (() => {
         const messageMeta = document.querySelector('meta[name="login-message"]');

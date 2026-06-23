@@ -3,14 +3,15 @@
 {% block page_subtitle %}Manage staff logins, roles, status, and password resets.{% endblock %}
 {% block content %}
   <section class="panel">
-    <div class="toolbar">
-      <span></span>
+    <div class="toolbar" data-live-search-form>
+      <input placeholder="Search users" autocomplete="off" data-live-search data-live-target="#users_table">
+      <button class="secondary-button" type="button" data-live-find>Find</button>
       {% if can(current_user, 'users', 'create') %}
         <a class="primary-button" href="{{ url_for('users.create') }}">Add user</a>
       {% endif %}
     </div>
     <div class="table-wrap">
-      <table>
+      <table id="users_table">
         <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last login</th><th>Actions</th></tr></thead>
         <tbody>
           {% for user in users %}
@@ -33,6 +34,7 @@
           {% else %}
             <tr><td colspan="6" class="empty">No users.</td></tr>
           {% endfor %}
+          <tr class="empty live-empty" data-live-empty hidden><td colspan="6">No matching users.</td></tr>
         </tbody>
       </table>
     </div>

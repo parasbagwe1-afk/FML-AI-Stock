@@ -3,7 +3,8 @@
 {% block page_subtitle %}Customer receivables, supplier payables, and unallocated advances.{% endblock %}
 {% block content %}
   <section class="panel">
-    <form method="get" class="toolbar">
+    <form method="get" class="toolbar" data-live-search-form>
+      <input name="q" placeholder="Search" value="{{ request.args.get('q','') }}" autocomplete="off" data-live-search data-live-target="#outstanding_tables">
       <select name="company_id">
         {% if active_company %}
           <option value="{{ active_company.id }}" selected>{{ active_company.code }}</option>
@@ -20,10 +21,11 @@
           <option value="{{ status }}" {% if request.args.get('status') == status %}selected{% endif %}>{{ status }}</option>
         {% endfor %}
       </select>
-      <button class="secondary-button" type="submit">Filter</button>
+      <button class="secondary-button" type="submit" data-live-find>Find</button>
     </form>
   </section>
 
+  <div id="outstanding_tables">
   <section class="panel">
     <div class="panel-title"><h2>Customer Outstanding</h2><a href="{{ url_for('reports.show', name='customer-outstanding') }}">Export report</a></div>
     <div class="table-wrap"><table>
@@ -47,4 +49,5 @@
       <tbody>{% for row in advances %}<tr><td>{{ row.payment_date }}</td><td>{{ row.company.code }}</td><td>{{ row.payment_type }}</td><td>{{ row.customer.name if row.customer else row.supplier.name if row.supplier else '' }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.allocated_amount) }}</td><td>{{ fmt_money(row.unallocated_amount) }}</td></tr>{% else %}<tr><td colspan="7" class="empty">No advances.</td></tr>{% endfor %}</tbody>
     </table></div>
   </section>
+  </div>
 {% endblock %}

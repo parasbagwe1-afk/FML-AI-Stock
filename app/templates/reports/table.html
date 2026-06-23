@@ -3,15 +3,17 @@
 {% block page_subtitle %}Use exports for print-friendly PDF, spreadsheet, or CSV output.{% endblock %}
 {% block content %}
   <section class="panel">
-    <div class="toolbar">
+    <form class="toolbar" method="get" data-live-search-form>
       <a class="secondary-button" href="{{ url_for('reports.index') }}">All reports</a>
+      <input name="q" placeholder="Search report" value="{{ request.args.get('q','') }}" autocomplete="off" data-live-search data-live-target="#report_table">
+      <button class="secondary-button" type="submit" data-live-find>Find</button>
       <span class="spacer"></span>
       <a class="secondary-button" href="{{ url_for('reports.show', name=request.view_args.name, format='csv') }}">CSV</a>
       <a class="secondary-button" href="{{ url_for('reports.show', name=request.view_args.name, format='xlsx') }}">XLSX</a>
       <a class="secondary-button" href="{{ url_for('reports.show', name=request.view_args.name, format='pdf') }}">PDF</a>
-    </div>
+    </form>
     <div class="table-wrap tall">
-      <table>
+      <table id="report_table">
         <thead><tr>{% for header in headers %}<th>{{ header }}</th>{% endfor %}</tr></thead>
         <tbody>
           {% for row in rows %}
@@ -19,6 +21,7 @@
           {% else %}
             <tr><td colspan="{{ headers|length }}" class="empty">No rows for this report.</td></tr>
           {% endfor %}
+          <tr class="empty live-empty" data-live-empty hidden><td colspan="{{ headers|length }}">No matching rows.</td></tr>
         </tbody>
       </table>
     </div>

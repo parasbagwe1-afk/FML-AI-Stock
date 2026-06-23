@@ -187,7 +187,7 @@ def seed_admin(app):
             "password_hash": "placeholder",
         },
     )
-    if created or admin.password_hash == "placeholder":
+    if created or admin.password_hash == "placeholder" or not admin.check_password(app.config["ADMIN_PASSWORD"]):
         admin.set_password(app.config["ADMIN_PASSWORD"])
         admin.last_login_at = None
         audit(

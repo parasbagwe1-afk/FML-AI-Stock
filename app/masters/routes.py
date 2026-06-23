@@ -214,7 +214,10 @@ def apply_form(record, kind):
     elif kind == "customers":
         record.code = form["code"].strip()
         record.name = form["name"].strip()
-        record.customer_type = form.get("customer_type") or "CASH_AND_BILL"
+        customer_type = form.get("customer_type") or "CASH_AND_BILL"
+        if customer_type not in {"CASH", "BILL", "CASH_AND_BILL"}:
+            raise ValueError("Customer type must be CASH, BILL, or CASH_AND_BILL.")
+        record.customer_type = customer_type
         record.gst_number = form.get("gst_number") or None
         record.mobile = form.get("mobile") or None
         record.email = form.get("email") or None

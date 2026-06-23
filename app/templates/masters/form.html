@@ -31,7 +31,8 @@
         <label>Customer type
           <select name="customer_type">
             <option value="CASH" {% if record.customer_type == 'CASH' %}selected{% endif %}>CASH</option>
-            <option value="CASH_AND_BILL" {% if record.customer_type != 'CASH' %}selected{% endif %}>CASH_AND_BILL</option>
+            <option value="BILL" {% if record.customer_type == 'BILL' %}selected{% endif %}>BILL</option>
+            <option value="CASH_AND_BILL" {% if record.customer_type not in ['CASH', 'BILL'] %}selected{% endif %}>CASH_AND_BILL</option>
           </select>
         </label>
         <label>GST number <input name="gst_number" value="{{ record.gst_number or '' }}"></label>

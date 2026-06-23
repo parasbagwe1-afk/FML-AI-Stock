@@ -274,6 +274,13 @@ document.addEventListener("click", async (event) => {
     }
   }
 
+  const liveFind = event.target.closest("[data-live-find]");
+  if (liveFind) {
+    const form = liveFind.closest("[data-live-search-form]");
+    const input = form && form.querySelector("[data-live-search]");
+    applyLiveSearch(input);
+  }
+
   startBackgroundMusic();
 });
 
@@ -318,6 +325,37 @@ function updateLineTotal(row) {
   if (!output) return;
   const subtotal = quantity * rate;
   output.textContent = formatPreviewMoney(subtotal + subtotal * gst / 100);
+}
+
+function applyLiveSearch(input) {
+  if (!input || !input.dataset.liveTarget) return;
+  const target = document.querySelector(input.dataset.liveTarget);
+  if (!target) return;
+  const query = input.value.trim().toLowerCase();
+  const tables = target.matches("table") ? [target] : Array.from(target.querySelectorAll("table"));
+
+  tables.forEach((table) => {
+    const rows = Array.from(table.querySelectorAll("tbody tr"));
+    const emptyRows = rows.filter((row) => row.matches("[data-live-empty], .empty"));
+    let visibleCount = 0;
+
+    rows.forEach((row) => {
+      if (row.matches("[data-live-empty]")) return;
+      if (row.classList.contains("empty")) {
+        row.hidden = Boolean(query);
+        return;
+      }
+      const visible = !query || row.textContent.toLowerCase().includes(query);
+      row.hidden = !visible;
+      if (visible) visibleCount += 1;
+    });
+
+    emptyRows
+      .filter((row) => row.matches("[data-live-empty]"))
+      .forEach((row) => {
+        row.hidden = !query || visibleCount > 0;
+      });
+  });
 }
 
 function filterStockBookPair(form, companySelector, stockBookSelector, categorySelector) {
@@ -387,6 +425,10 @@ document.addEventListener("input", (event) => {
   ) {
     updateLineTotal(event.target.closest(".line-row"));
   }
+
+  if (event.target.matches("[data-live-search]")) {
+    applyLiveSearch(event.target);
+  }
 });
 
 document.addEventListener("visibilitychange", () => {
@@ -400,3 +442,4 @@ document.addEventListener("visibilitychange", () => {
 updateMusicControls();
 document.querySelectorAll("form").forEach(filterStockBooks);
 document.querySelectorAll(".line-row").forEach(updateLineTotal);
+document.querySelectorAll("[data-live-search]").forEach(applyLiveSearch);

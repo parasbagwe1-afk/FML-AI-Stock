@@ -47,8 +47,16 @@
           {% for line in sale.lines %}
             <div class="line-row">
               <input type="hidden" name="line_id[]" value="{{ line.id }}">
-              <input type="hidden" name="item_id[]" value="{{ line.item_id }}">
-              <input value="{{ line.item.display_name }}" disabled>
+              <div class="item-combobox" data-item-picker>
+                <input name="item_search[]" type="text" value="{{ line.item.display_name }}" placeholder="Select or type item" autocomplete="off" required data-item-search>
+                <input name="item_id[]" type="hidden" value="{{ line.item_id }}" data-item-value>
+                <button type="button" class="item-combobox-button" data-item-open aria-label="Show item list"></button>
+                <datalist data-item-options>
+                  {% for item in items %}
+                    <option value="{{ item.display_name }}" data-item-id="{{ item.id }}"></option>
+                  {% endfor %}
+                </datalist>
+              </div>
               <input name="quantity[]" type="number" step="0.001" min="0" value="{{ line.quantity }}" required>
               <input name="rate[]" type="number" step="0.0001" min="0" value="{{ line.sale_rate }}" required>
               <input name="gst_percent[]" type="number" step="0.01" min="0" value="{{ line.gst_percent }}">

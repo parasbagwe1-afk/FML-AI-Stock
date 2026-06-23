@@ -1,6 +1,7 @@
 from app.extensions import db
 from app.models import (
     FIFOLayer,
+    Item,
     Receivable,
     Sale,
     StockLedgerEntry,
@@ -110,6 +111,52 @@ def test_sale_edit_updates_quantity_rate_totals_and_fifo(app):
         assert available_quantity(data["ai"].id, data["ai_gst"].id, data["item"].id) == 7
 
 
+def test_sale_edit_can_change_item_before_receipt_allocation(app):
+    with app.app_context():
+        data = ids()
+        replacement_item = Item.query.filter_by(code="2").one()
+        create_opening_stock(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "reference_number": "SALE-ITEM-CHANGE-STOCK",
+                "opening_date": "2026-06-01",
+            },
+            [
+                {"item_id": data["item"].id, "quantity": "10", "rate": "100"},
+                {"item_id": replacement_item.id, "quantity": "6", "rate": "80"},
+            ],
+            admin(),
+        )
+        sale = create_sale(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "customer_id": data["customer"].id,
+                "sale_type": "GST",
+                "invoice_number": "ITEM-CHANGE-INV",
+                "invoice_date": "2026-06-02",
+            },
+            [{"item_id": data["item"].id, "quantity": "2", "rate": "150", "gst_percent": "18"}],
+            admin(),
+        )
+        db.session.flush()
+        line = sale.lines[0]
+
+        update_sale_lines(
+            sale,
+            [{"line_id": line.id, "item_id": replacement_item.id, "quantity": "3", "rate": "200", "gst_percent": "18"}],
+            admin(),
+        )
+        db.session.commit()
+
+        assert line.item_id == replacement_item.id
+        assert sale.grand_total == 708
+        assert sale.fifo_cost == 240
+        assert available_quantity(data["ai"].id, data["ai_gst"].id, data["item"].id) == 10
+        assert available_quantity(data["ai"].id, data["ai_gst"].id, replacement_item.id) == 3
+
+
 def test_sale_delete_restores_fifo_stock(app):
     with app.app_context():
         data = ids()
@@ -164,6 +211,8 @@ def test_company_user_sees_edit_for_existing_sale(client, app):
     edit_response = client.get(edit_href)
     assert edit_response.status_code == 200
     assert b"SALES-EDIT-INV" in edit_response.data
+    assert b"data-item-search" in edit_response.data
+    assert b"data-item-value" in edit_response.data
 
 
 def test_transfer_header_edit_updates_linked_references(app):

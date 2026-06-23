@@ -1,10 +1,12 @@
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.core.company_context import active_company
+from app.core.formatting import money
 from app.core.security import require_permission
 from app.extensions import db
 from app.models import Company, Customer, Payable, Payment, PaymentMode, Receivable, Supplier
+from app.services.entry_exports import export_entry, payment_rows
 from app.services.payments import create_customer_receipt, create_supplier_payment
 
 bp = Blueprint("payments", __name__, url_prefix="/finance")
@@ -35,6 +37,12 @@ def require_active_company_value(company_id):
         raise ValueError("This login can record payments only for the active company.")
 
 
+def require_active_company_document(company_id):
+    company = active_company()
+    if company and str(company_id or "") != str(company.id):
+        abort(403)
+
+
 @bp.route("/payments", methods=["GET"])
 @login_required
 @require_permission("payments", "view")
@@ -45,6 +53,21 @@ def index():
         recent_payments = recent_payments.filter(Payment.company_id == company.id)
     recent_payments = recent_payments.order_by(Payment.payment_date.desc(), Payment.id.desc()).limit(30).all()
     return render_template("payments/index.html", recent_payments=recent_payments, **finance_options())
+
+
+@bp.route("/payments/<int:payment_id>/export/<fmt>")
+@login_required
+@require_permission("payments", "view")
+def payment_export(payment_id, fmt):
+    payment = db.session.get(Payment, payment_id)
+    if not payment:
+        abort(404)
+    require_active_company_document(payment.company_id)
+    try:
+        title, rows = payment_rows(payment)
+        return export_entry(title, rows, fmt)
+    except ValueError:
+        abort(404)
 
 
 @bp.route("/payments/customer-receipt", methods=["POST"])
@@ -132,10 +155,20 @@ def outstanding():
             )
         )
     advances = advances.order_by(Payment.payment_date.desc()).all()
+    summary = {
+        "receivable_balance": money(sum((row.balance_amount for row in receivables), 0)),
+        "payable_balance": money(sum((row.balance_amount for row in payables), 0)),
+        "advance_unallocated": money(sum((row.unallocated_amount for row in advances), 0)),
+        "receivable_count": len(receivables),
+        "payable_count": len(payables),
+        "advance_count": len(advances),
+        "search": search,
+    }
     return render_template(
         "payments/outstanding.html",
         receivables=receivables,
         payables=payables,
         advances=advances,
+        summary=summary,
         companies=companies.order_by(Company.code).all(),
     )

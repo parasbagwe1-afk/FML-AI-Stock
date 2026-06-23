@@ -262,6 +262,72 @@ function applyLiveSearch(input) {
         row.hidden = !query || visibleCount > 0;
       });
   });
+  updateReportTotals();
+  updateOutstandingSummary();
+}
+
+function parseMoneyText(text) {
+  const cleaned = String(text || "")
+    .replace(/[₹,\s]/g, "")
+    .replace(/[^\d.-]/g, "");
+  if (!cleaned || cleaned === "-" || cleaned === ".") return 0;
+  const value = Number.parseFloat(cleaned);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function formatCountLabel(count, singular, plural) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function updateReportTotals() {
+  document.querySelectorAll("[data-report-totals]").forEach((summary) => {
+    const table = document.querySelector(summary.dataset.reportTable);
+    if (!table) return;
+    const visibleRows = Array.from(table.querySelectorAll("tbody tr")).filter(
+      (row) => !row.hidden && !row.matches("[data-live-empty], .empty")
+    );
+    summary.querySelectorAll("[data-report-total]").forEach((card) => {
+      const column = Number.parseInt(card.dataset.column || "", 10);
+      if (!Number.isFinite(column)) return;
+      const total = visibleRows.reduce((sum, row) => {
+        const cell = row.children[column];
+        return sum + parseMoneyText(cell?.textContent || "");
+      }, 0);
+      const value = card.querySelector("strong");
+      if (value) value.textContent = formatPreviewMoney(total);
+    });
+  });
+}
+
+function updateOutstandingSummary() {
+  const summary = document.querySelector("[data-outstanding-summary]");
+  if (!summary) return;
+  const target = document.querySelector(summary.dataset.liveSummaryTarget);
+  if (!target) return;
+  const tables = Array.from(target.querySelectorAll("table"));
+  summary.querySelectorAll("[data-summary-table]").forEach((card, index) => {
+    const table = tables[index];
+    if (!table) return;
+    const column = Number.parseInt(card.dataset.summaryColumn || "", 10);
+    const visibleRows = Array.from(table.querySelectorAll("tbody tr")).filter(
+      (row) => !row.hidden && !row.matches("[data-live-empty], .empty")
+    );
+    const total = visibleRows.reduce((sum, row) => {
+      const cell = row.children[column];
+      return sum + parseMoneyText(cell?.textContent || "");
+    }, 0);
+    const value = card.querySelector("strong");
+    const small = card.querySelector("small");
+    if (value) value.textContent = formatPreviewMoney(total);
+    if (small) {
+      const labels = [
+        ["receivable", "receivables"],
+        ["payable", "payables"],
+        ["advance", "advances"],
+      ][index] || ["entry", "entries"];
+      small.textContent = formatCountLabel(visibleRows.length, labels[0], labels[1]);
+    }
+  });
 }
 
 function filterStockBookPair(form, companySelector, stockBookSelector, categorySelector) {

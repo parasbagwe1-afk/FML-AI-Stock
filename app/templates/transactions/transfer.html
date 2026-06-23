@@ -74,6 +74,8 @@
             <td>{{ 'Yes' if row.mismatch_approved else 'No' }}</td>
             <td>{{ user_name(row.created_by_id) }}</td>
             <td class="actions">
+              <a class="table-action" href="{{ url_for('transactions.transfer_export', transfer_id=row.id, fmt='pdf') }}">PDF</a>
+              <a class="table-action" href="{{ url_for('transactions.transfer_export', transfer_id=row.id, fmt='xlsx') }}">XL</a>
               {% if can(current_user, 'transfer', 'edit') or can(current_user, 'transfer', 'create') %}
                 <a class="table-action" href="{{ url_for('transactions.transfer_edit', transfer_id=row.id) }}">Edit</a>
               {% endif %}

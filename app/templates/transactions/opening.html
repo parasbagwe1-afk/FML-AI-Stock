@@ -104,6 +104,8 @@
             <tr>
               <td>Stock</td><td>{{ row.company.code }}</td><td>{{ row.stock_book.name }}</td><td>{{ row.reference_number }}</td><td></td><td></td><td>{{ user_name(row.created_by_id) }}</td>
               <td class="actions">
+                <a class="table-action" href="{{ url_for('transactions.opening_stock_export', opening_id=row.id, fmt='pdf') }}">PDF</a>
+                <a class="table-action" href="{{ url_for('transactions.opening_stock_export', opening_id=row.id, fmt='xlsx') }}">XL</a>
                 {% if can(current_user, 'opening', 'create') or can(current_user, 'opening', 'deactivate') %}
                   <a class="table-action" href="{{ url_for('transactions.opening_stock_edit', opening_id=row.id) }}">Edit</a>
                   <form method="post" action="{{ url_for('transactions.opening_stock_delete', opening_id=row.id) }}" data-confirm="Delete this opening stock and reverse it?">
@@ -118,6 +120,8 @@
             <tr>
               <td>Receivable</td><td>{{ row.company.code }}</td><td>{{ row.customer.name }}</td><td>{{ row.document_number }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.balance_amount) }}</td><td>{{ user_name(row.created_by_id) }}</td>
               <td class="actions">
+                <a class="table-action" href="{{ url_for('transactions.opening_receivable_export', receivable_id=row.id, fmt='pdf') }}">PDF</a>
+                <a class="table-action" href="{{ url_for('transactions.opening_receivable_export', receivable_id=row.id, fmt='xlsx') }}">XL</a>
                 {% if can(current_user, 'opening', 'create') or can(current_user, 'opening', 'deactivate') %}
                   <a class="table-action" href="{{ url_for('transactions.opening_receivable_edit', receivable_id=row.id) }}">Edit</a>
                   <form method="post" action="{{ url_for('transactions.opening_receivable_delete', receivable_id=row.id) }}" data-confirm="Delete this opening receivable?">
@@ -132,6 +136,8 @@
             <tr>
               <td>Payable</td><td>{{ row.company.code }}</td><td>{{ row.supplier.name }}</td><td>{{ row.document_number }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.balance_amount) }}</td><td>{{ user_name(row.created_by_id) }}</td>
               <td class="actions">
+                <a class="table-action" href="{{ url_for('transactions.opening_payable_export', payable_id=row.id, fmt='pdf') }}">PDF</a>
+                <a class="table-action" href="{{ url_for('transactions.opening_payable_export', payable_id=row.id, fmt='xlsx') }}">XL</a>
                 {% if can(current_user, 'opening', 'create') or can(current_user, 'opening', 'deactivate') %}
                   <a class="table-action" href="{{ url_for('transactions.opening_payable_edit', payable_id=row.id) }}">Edit</a>
                   <form method="post" action="{{ url_for('transactions.opening_payable_delete', payable_id=row.id) }}" data-confirm="Delete this opening payable?">
@@ -146,6 +152,8 @@
             <tr>
               <td>{{ row.payment_type }}</td><td>{{ row.company.code }}</td><td>{{ row.customer.name if row.customer else row.supplier.name }}</td><td>{{ row.reference_number or '' }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.unallocated_amount) }}</td><td>{{ user_name(row.created_by_id) }}</td>
               <td class="actions">
+                <a class="table-action" href="{{ url_for('transactions.opening_advance_export', payment_id=row.id, fmt='pdf') }}">PDF</a>
+                <a class="table-action" href="{{ url_for('transactions.opening_advance_export', payment_id=row.id, fmt='xlsx') }}">XL</a>
                 {% if can(current_user, 'opening', 'create') or can(current_user, 'opening', 'deactivate') %}
                   <a class="table-action" href="{{ url_for('transactions.opening_advance_edit', payment_id=row.id) }}">Edit</a>
                   <form method="post" action="{{ url_for('transactions.opening_advance_delete', payment_id=row.id) }}" data-confirm="Delete this opening advance?">

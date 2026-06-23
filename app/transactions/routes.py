@@ -21,6 +21,16 @@ from app.models import (
     Supplier,
 )
 from app.services.references import next_reference
+from app.services.entry_exports import (
+    export_entry,
+    opening_stock_rows,
+    payable_rows,
+    purchase_rows,
+    receivable_rows,
+    sale_rows,
+    transfer_rows,
+    payment_rows,
+)
 from app.services.transactions import (
     create_opening_advance_paid,
     create_opening_advance_received,
@@ -96,6 +106,14 @@ def require_transfer_scope(data):
         raise ValueError("Transfers must include the active company.")
 
 
+def export_response(title_rows, fmt):
+    try:
+        title, rows = title_rows
+        return export_entry(title, rows, fmt)
+    except ValueError:
+        abort(404)
+
+
 @bp.route("/reference/<kind>")
 @login_required
 def reference(kind):
@@ -169,6 +187,17 @@ def purchase_delete(purchase_id):
     return redirect(url_for("transactions.purchase"))
 
 
+@bp.route("/purchase/<int:purchase_id>/export/<fmt>")
+@login_required
+@require_permission("purchase", "view")
+def purchase_export(purchase_id, fmt):
+    purchase = db.session.get(Purchase, purchase_id)
+    if not purchase:
+        abort(404)
+    require_active_company_document(purchase.company_id)
+    return export_response(purchase_rows(purchase), fmt)
+
+
 @bp.route("/sale", methods=["GET", "POST"])
 @login_required
 @require_permission("sale", "view")
@@ -234,6 +263,17 @@ def sale_delete(sale_id):
         db.session.rollback()
         flash(str(exc), "danger")
     return redirect(url_for("transactions.sale"))
+
+
+@bp.route("/sale/<int:sale_id>/export/<fmt>")
+@login_required
+@require_permission("sale", "view")
+def sale_export(sale_id, fmt):
+    sale = db.session.get(Sale, sale_id)
+    if not sale:
+        abort(404)
+    require_active_company_document(sale.company_id)
+    return export_response(sale_rows(sale), fmt)
 
 
 @bp.route("/transfer", methods=["GET", "POST"])
@@ -310,6 +350,17 @@ def transfer_delete(transfer_id):
         db.session.rollback()
         flash(str(exc), "danger")
     return redirect(url_for("transactions.transfer"))
+
+
+@bp.route("/transfer/<int:transfer_id>/export/<fmt>")
+@login_required
+@require_permission("transfer", "view")
+def transfer_export(transfer_id, fmt):
+    transfer = db.session.get(InterCompanyTransfer, transfer_id)
+    if not transfer:
+        abort(404)
+    require_active_company_document(transfer.from_company_id, transfer.to_company_id)
+    return export_response(transfer_rows(transfer), fmt)
 
 
 @bp.route("/opening", methods=["GET"])
@@ -396,6 +447,17 @@ def opening_stock_delete(opening_id):
     return redirect(url_for("transactions.opening"))
 
 
+@bp.route("/opening/stock/<int:opening_id>/export/<fmt>")
+@login_required
+@require_permission("opening", "view")
+def opening_stock_export(opening_id, fmt):
+    opening = db.session.get(OpeningStock, opening_id)
+    if not opening:
+        abort(404)
+    require_active_company_document(opening.company_id)
+    return export_response(opening_stock_rows(opening), fmt)
+
+
 @bp.route("/opening/stock/<int:opening_id>/edit", methods=["GET", "POST"])
 @login_required
 def opening_stock_edit(opening_id):
@@ -437,6 +499,17 @@ def opening_receivable_delete(receivable_id):
         db.session.rollback()
         flash(str(exc), "danger")
     return redirect(url_for("transactions.opening"))
+
+
+@bp.route("/opening/receivable/<int:receivable_id>/export/<fmt>")
+@login_required
+@require_permission("opening", "view")
+def opening_receivable_export(receivable_id, fmt):
+    receivable = db.session.get(Receivable, receivable_id)
+    if not receivable:
+        abort(404)
+    require_active_company_document(receivable.company_id)
+    return export_response(receivable_rows(receivable), fmt)
 
 
 @bp.route("/opening/receivable/<int:receivable_id>/edit", methods=["GET", "POST"])
@@ -482,6 +555,17 @@ def opening_payable_delete(payable_id):
     return redirect(url_for("transactions.opening"))
 
 
+@bp.route("/opening/payable/<int:payable_id>/export/<fmt>")
+@login_required
+@require_permission("opening", "view")
+def opening_payable_export(payable_id, fmt):
+    payable = db.session.get(Payable, payable_id)
+    if not payable:
+        abort(404)
+    require_active_company_document(payable.company_id)
+    return export_response(payable_rows(payable), fmt)
+
+
 @bp.route("/opening/payable/<int:payable_id>/edit", methods=["GET", "POST"])
 @login_required
 def opening_payable_edit(payable_id):
@@ -523,6 +607,17 @@ def opening_advance_delete(payment_id):
         db.session.rollback()
         flash(str(exc), "danger")
     return redirect(url_for("transactions.opening"))
+
+
+@bp.route("/opening/advance/<int:payment_id>/export/<fmt>")
+@login_required
+@require_permission("opening", "view")
+def opening_advance_export(payment_id, fmt):
+    payment = db.session.get(Payment, payment_id)
+    if not payment:
+        abort(404)
+    require_active_company_document(payment.company_id)
+    return export_response(payment_rows(payment), fmt)
 
 
 @bp.route("/opening/advance/<int:payment_id>/edit", methods=["GET", "POST"])

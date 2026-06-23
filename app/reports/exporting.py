@@ -1,4 +1,5 @@
 import csv
+import re
 from io import BytesIO, StringIO
 
 from flask import Response, send_file
@@ -11,7 +12,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 def export_table(title, headers, rows, fmt):
     fmt = (fmt or "").lower()
-    filename = title.lower().replace(" ", "-")
+    filename = re.sub(r"[^a-z0-9._-]+", "-", title.lower()).strip("-") or "export"
     if fmt == "csv":
         return export_csv(filename, headers, rows)
     if fmt == "xlsx":

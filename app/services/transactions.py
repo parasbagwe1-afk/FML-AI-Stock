@@ -619,15 +619,14 @@ def update_purchase_lines(purchase, lines, data, user):
 
     for line, row in ordered:
         item = active_item(row.get("item_id") or line.item_id)
-        if item.id != line.item_id:
-            raise ValueError("Purchase item cannot be changed after saving. Delete and re-enter the purchase if the item is wrong.")
         quantity = positive_qty(row.get("quantity"))
         rate = Decimal(row.get("rate"))
         if rate <= Decimal("0"):
             raise ValueError("Rate must be greater than zero.")
         gst_percent = Decimal(row.get("gst_percent") or item.gst_percent or 0)
         changed = (
-            qty(line.quantity) != quantity
+            item.id != line.item_id
+            or qty(line.quantity) != quantity
             or Decimal(line.rate) != rate
             or Decimal(line.gst_percent) != gst_percent
         )
@@ -641,6 +640,7 @@ def update_purchase_lines(purchase, lines, data, user):
 
         subtotal, gst_amount, line_total = _line_total(quantity, rate, gst_percent, taxable)
         line.quantity = quantity
+        line.item_id = item.id
         line.rate = rate
         line.gst_percent = gst_percent
         line.subtotal = subtotal
@@ -650,6 +650,7 @@ def update_purchase_lines(purchase, lines, data, user):
         if layer:
             layer.company_id = purchase.company_id
             layer.stock_book_id = purchase.stock_book_id
+            layer.item_id = item.id
             layer.source_reference = purchase.bill_number
             layer.source_date = purchase.bill_date
             if changed or qty(layer.available_quantity) == qty(layer.original_quantity):
@@ -890,15 +891,14 @@ def update_sale_lines(sale, lines, user):
     parsed = []
     for line, row in ordered:
         item = active_item(row.get("item_id") or line.item_id)
-        if item.id != line.item_id:
-            raise ValueError("Sale item cannot be changed after saving. Delete and re-enter the sale if the item is wrong.")
         quantity = positive_qty(row.get("quantity"))
         sale_rate = Decimal(row.get("rate"))
         if sale_rate <= Decimal("0"):
             raise ValueError("Sale rate must be greater than zero.")
         gst_percent = Decimal(row.get("gst_percent") or item.gst_percent or 0)
         if (
-            qty(line.quantity) != quantity
+            item.id != line.item_id
+            or qty(line.quantity) != quantity
             or Decimal(line.sale_rate) != sale_rate
             or Decimal(line.gst_percent) != gst_percent
         ):
@@ -948,6 +948,7 @@ def update_sale_lines(sale, lines, user):
                 getattr(user, "id", None),
             )
         line.quantity = quantity
+        line.item_id = item.id
         line.sale_rate = sale_rate
         line.gst_percent = gst_percent
         line.subtotal = subtotal

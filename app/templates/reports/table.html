@@ -12,6 +12,17 @@
       <a class="secondary-button" href="{{ url_for('reports.show', name=request.view_args.name, format='xlsx') }}">XLSX</a>
       <a class="secondary-button" href="{{ url_for('reports.show', name=request.view_args.name, format='pdf') }}">PDF</a>
     </form>
+    {% if totals %}
+      <div class="metric-grid report-total-grid" data-report-totals data-report-table="#report_table">
+        {% for total in totals %}
+          <article class="metric-card" data-report-total data-column="{{ total.column }}">
+            <span>{{ total.label }}</span>
+            <strong>{{ total.value }}</strong>
+            <small>Shown rows total</small>
+          </article>
+        {% endfor %}
+      </div>
+    {% endif %}
     <div class="table-wrap tall">
       <table id="report_table">
         <thead><tr>{% for header in headers %}<th>{{ header }}</th>{% endfor %}</tr></thead>

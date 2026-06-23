@@ -78,6 +78,34 @@ def creator_name(user_id):
     return user.name if user else "Unknown user"
 
 
+def parse_money_cell(value):
+    text = str(value)
+    if "₹" not in text:
+        return None
+    try:
+        return money(text.replace("₹", ""))
+    except ValueError:
+        return None
+
+
+def report_totals(headers, rows):
+    totals = []
+    for index, header in enumerate(headers):
+        total = Decimal("0.00")
+        has_money = False
+        for row in rows:
+            if index >= len(row):
+                continue
+            amount = parse_money_cell(row[index])
+            if amount is None:
+                continue
+            total = money(total + amount)
+            has_money = True
+        if has_money:
+            totals.append({"label": header, "value": fmt_money(total), "column": index})
+    return totals
+
+
 @bp.route("/")
 @login_required
 @require_permission("reports", "view")
@@ -98,7 +126,14 @@ def show(name):
     if export_format:
         require_permission("reports", "export")(lambda: None)()
         return export_table(title, headers, rows, export_format)
-    return render_template("reports/table.html", title=title, headers=headers, rows=rows, reports=REPORT_TITLES)
+    return render_template(
+        "reports/table.html",
+        title=title,
+        headers=headers,
+        rows=rows,
+        reports=REPORT_TITLES,
+        totals=report_totals(headers, rows),
+    )
 
 
 def build_report(name):

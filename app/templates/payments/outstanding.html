@@ -26,6 +26,23 @@
   </section>
 
   <div id="outstanding_tables">
+  <section class="metric-grid outstanding-summary" data-outstanding-summary data-live-summary-target="#outstanding_tables">
+    <article class="metric-card" data-summary-table="receivables" data-summary-column="7">
+      <span>Customer Balance</span>
+      <strong>{{ fmt_money(summary.receivable_balance) }}</strong>
+      <small>{{ summary.receivable_count }} receivable{{ '' if summary.receivable_count == 1 else 's' }}</small>
+    </article>
+    <article class="metric-card amber" data-summary-table="payables" data-summary-column="7">
+      <span>Supplier Balance</span>
+      <strong>{{ fmt_money(summary.payable_balance) }}</strong>
+      <small>{{ summary.payable_count }} payable{{ '' if summary.payable_count == 1 else 's' }}</small>
+    </article>
+    <article class="metric-card" data-summary-table="advances" data-summary-column="6">
+      <span>Open Advances</span>
+      <strong>{{ fmt_money(summary.advance_unallocated) }}</strong>
+      <small>{{ summary.advance_count }} advance{{ '' if summary.advance_count == 1 else 's' }}</small>
+    </article>
+  </section>
   <section class="panel">
     <div class="panel-title"><h2>Customer Outstanding</h2><a href="{{ url_for('reports.show', name='customer-outstanding') }}">Export report</a></div>
     <div class="table-wrap"><table>

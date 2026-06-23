@@ -2,7 +2,7 @@ from app.extensions import db
 import pytest
 from decimal import Decimal
 
-from app.models import FIFOLayer, Payable, Purchase, StockLedgerEntry
+from app.models import FIFOLayer, Item, Payable, Purchase, StockLedgerEntry
 from app.services.stock import available_quantity
 from app.services.transactions import create_purchase, create_sale, update_purchase_header, update_purchase_lines
 from tests.test_fifo_workflows import admin, ids
@@ -150,6 +150,42 @@ def test_purchase_edit_updates_item_quantity_rate_and_stock(app):
         assert available_quantity(data["ai"].id, data["ai_gst"].id, data["item"].id) == 3
 
 
+def test_purchase_edit_can_change_item_before_stock_is_consumed(app):
+    with app.app_context():
+        data = ids()
+        replacement_item = Item.query.filter_by(code="2").one()
+        purchase = create_purchase(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "supplier_id": data["supplier"].id,
+                "purchase_type": "GST",
+                "bill_number": "ITEM-CHANGE-BILL",
+                "bill_date": "2026-06-01",
+            },
+            [{"item_id": data["item"].id, "quantity": "2", "rate": "100", "gst_percent": "18"}],
+            admin(),
+        )
+        db.session.flush()
+        line = purchase.lines[0]
+
+        update_purchase_lines(
+            purchase,
+            [{"line_id": line.id, "item_id": replacement_item.id, "quantity": "3", "rate": "125", "gst_percent": "18"}],
+            {"payment_status": "UNPAID"},
+            admin(),
+        )
+        db.session.commit()
+
+        layer = FIFOLayer.query.filter_by(source_type="PURCHASE", source_id=purchase.id).one()
+        ledger = StockLedgerEntry.query.filter_by(transaction_type="PURCHASE", transaction_id=purchase.id).one()
+        assert line.item_id == replacement_item.id
+        assert layer.item_id == replacement_item.id
+        assert ledger.item_id == replacement_item.id
+        assert available_quantity(data["ai"].id, data["ai_gst"].id, data["item"].id) == 0
+        assert available_quantity(data["ai"].id, data["ai_gst"].id, replacement_item.id) == 3
+
+
 def test_purchase_edit_rejects_line_change_after_stock_consumed(app):
     with app.app_context():
         data = ids()
@@ -212,6 +248,8 @@ def test_purchase_edit_page_renders(client, app):
     assert response.status_code == 200
     assert b"Edit Purchase" in response.data
     assert b"UI-BILL" in response.data
+    assert b"data-item-search" in response.data
+    assert b"data-item-value" in response.data
 
 
 def test_company_user_sees_edit_for_existing_purchase(client, app):

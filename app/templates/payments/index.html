@@ -56,12 +56,12 @@
   <section class="panel">
     <div class="panel-title"><h2>Recent Payments</h2><a href="{{ url_for('reports.show', name='payment-history') }}">Report</a></div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Date</th><th>Company</th><th>Type</th><th>Party</th><th>Mode</th><th>Amount</th><th>Allocated</th><th>Advance</th><th>Reference</th><th>Created By</th></tr></thead>
+      <thead><tr><th>Date</th><th>Company</th><th>Type</th><th>Party</th><th>Mode</th><th>Amount</th><th>Allocated</th><th>Advance</th><th>Reference</th><th>Created By</th><th>Actions</th></tr></thead>
       <tbody>
         {% for row in recent_payments %}
-          <tr><td>{{ row.payment_date }}</td><td>{{ row.company.code }}</td><td>{{ row.payment_type }}</td><td>{{ row.customer.name if row.customer else row.supplier.name if row.supplier else '' }}</td><td>{{ row.mode }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.allocated_amount) }}</td><td>{{ fmt_money(row.unallocated_amount) }}</td><td>{{ row.reference_number or '' }}</td><td>{{ user_name(row.created_by_id) }}</td></tr>
+          <tr><td>{{ row.payment_date }}</td><td>{{ row.company.code }}</td><td>{{ row.payment_type }}</td><td>{{ row.customer.name if row.customer else row.supplier.name if row.supplier else '' }}</td><td>{{ row.mode }}</td><td>{{ fmt_money(row.total_amount) }}</td><td>{{ fmt_money(row.allocated_amount) }}</td><td>{{ fmt_money(row.unallocated_amount) }}</td><td>{{ row.reference_number or '' }}</td><td>{{ user_name(row.created_by_id) }}</td><td class="actions"><a class="table-action" href="{{ url_for('payments.payment_export', payment_id=row.id, fmt='pdf') }}">PDF</a><a class="table-action" href="{{ url_for('payments.payment_export', payment_id=row.id, fmt='xlsx') }}">XL</a></td></tr>
         {% else %}
-          <tr><td colspan="10" class="empty">No payments recorded.</td></tr>
+          <tr><td colspan="11" class="empty">No payments recorded.</td></tr>
         {% endfor %}
       </tbody>
     </table></div>

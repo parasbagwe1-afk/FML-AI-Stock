@@ -102,17 +102,20 @@ button, input, select, textarea { font: inherit; }
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: minmax(250px, 268px) minmax(0, 1fr);
 }
 .sidebar {
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
   padding: 18px;
   background: var(--sidebar-bg);
   color: #fff;
@@ -124,6 +127,7 @@ button, input, select, textarea { font: inherit; }
   align-items: center;
   gap: 12px;
   min-width: 0;
+  flex: 0 0 auto;
   padding: 4px 2px 8px;
 }
 .brand-mark {
@@ -161,15 +165,30 @@ button, input, select, textarea { font: inherit; }
   width: 100%;
   height: 100%;
 }
+.brand span:last-child {
+  min-width: 0;
+}
 .brand strong, .login-brand h1 { display: block; letter-spacing: 0; }
-.brand small { color: rgba(255, 255, 255, 0.72); display: block; margin-top: 2px; }
+.brand strong {
+  line-height: 1.22;
+  overflow-wrap: anywhere;
+}
+.brand small {
+  color: rgba(255, 255, 255, 0.72);
+  display: block;
+  margin-top: 3px;
+  line-height: 1.28;
+}
 .nav {
+  flex: 1 1 auto;
   display: grid;
+  align-content: start;
   gap: 4px;
   overflow-y: auto;
   overflow-x: hidden;
+  min-height: 0;
   min-width: 0;
-  padding-right: 4px;
+  padding: 0 4px 6px 0;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.34) transparent;
 }
@@ -201,6 +220,8 @@ button, input, select, textarea { font: inherit; }
   transform: translateX(3px);
 }
 .sidebar-footer {
+  flex: 0 0 auto;
+  min-width: 0;
   margin-top: auto;
   display: grid;
   gap: 8px;
@@ -210,6 +231,7 @@ button, input, select, textarea { font: inherit; }
 .footer-link {
   display: block;
   width: fit-content;
+  max-width: 100%;
   padding: 0;
   border: 0;
   background: transparent;
@@ -219,6 +241,7 @@ button, input, select, textarea { font: inherit; }
   color: rgba(255, 255, 255, 0.72);
   cursor: pointer;
   text-align: left;
+  overflow-wrap: anywhere;
   transition: color 160ms ease, transform 160ms ease;
 }
 .footer-link:hover,
@@ -664,6 +687,40 @@ textarea { min-height: 84px; resize: vertical; }
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 6px;
 }
+.item-combobox {
+  position: relative;
+  min-width: 0;
+}
+.item-combobox input[data-item-search] {
+  padding-right: 46px;
+}
+.item-combobox-button {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 40px;
+  height: calc(100% - 2px);
+  border: 0;
+  border-left: 1px solid #D0D5DD;
+  border-radius: 0 6px 6px 0;
+  background: #F8FAFC;
+  color: var(--navy);
+  cursor: pointer;
+}
+.item-combobox-button::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translate(-50%, -70%) rotate(45deg);
+}
+.item-combobox-button:hover {
+  background: #EEF4F8;
+}
 .primary-button, .secondary-button, .ghost-button, .icon-button, .link-button {
   position: relative;
   border: 0;
@@ -931,13 +988,49 @@ button.is-loading::after {
   }
 }
 
+@media (max-height: 760px) and (min-width: 981px) {
+  .sidebar {
+    gap: 10px;
+    padding: 14px;
+  }
+  .brand {
+    gap: 10px;
+    padding-bottom: 4px;
+  }
+  .company-brand-mark {
+    width: 64px;
+    height: 42px;
+    flex-basis: 64px;
+  }
+  .brand strong {
+    font-size: 0.92rem;
+  }
+  .brand small {
+    font-size: 0.78rem;
+  }
+  .nav a {
+    padding: 8px 10px;
+  }
+  .sidebar-footer {
+    gap: 6px;
+  }
+}
+
 @media (max-width: 980px) {
   .app-shell { grid-template-columns: 1fr; }
   .sidebar {
     position: static;
     height: auto;
+    min-height: auto;
+    max-height: none;
+    overflow: visible;
   }
-  .nav { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+  .nav {
+    flex: none;
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+    max-height: none;
+    overflow: visible;
+  }
   .grid.two, .form-grid, .form-grid.wide { grid-template-columns: 1fr; }
   .login-company-options { grid-template-columns: 1fr; }
   .login-field-grid, .login-secondary-actions { grid-template-columns: 1fr; }
@@ -950,5 +1043,37 @@ button.is-loading::after {
     padding: 10px;
     border: 1px solid var(--border);
     border-radius: 8px;
+  }
+}
+
+@media (max-width: 560px) {
+  .main {
+    padding: 14px;
+  }
+  .sidebar {
+    padding: 14px;
+  }
+  .brand {
+    align-items: flex-start;
+  }
+  .company-brand-mark {
+    width: 62px;
+    height: 40px;
+    flex-basis: 62px;
+  }
+  .nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .nav a {
+    padding: 9px 10px;
+    white-space: normal;
+  }
+  .topbar-actions {
+    justify-content: flex-start;
+  }
+  .company-chip,
+  .user-chip,
+  .music-control {
+    max-width: 100%;
   }
 }

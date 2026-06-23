@@ -235,10 +235,11 @@ document.addEventListener("click", async (event) => {
     if (grid && row) {
       const clone = row.cloneNode(true);
       clone.querySelectorAll("input").forEach((input) => (input.value = ""));
-      clone.querySelectorAll("select").forEach((select) => (select.selectedIndex = 0));
       clone.querySelectorAll("output").forEach((output) => (output.textContent = "₹0.00"));
+      clone.querySelectorAll("[data-item-picker]").forEach((picker) => delete picker.dataset.itemPickerReady);
       clone.classList.add("row-enter");
       grid.appendChild(clone);
+      initializeItemPickers(clone);
       updateLineTotal(clone);
       playTone("add");
       window.setTimeout(() => clone.classList.remove("row-enter"), 220);
@@ -281,11 +282,25 @@ document.addEventListener("click", async (event) => {
     applyLiveSearch(input);
   }
 
+  const itemOpen = event.target.closest("[data-item-open]");
+  if (itemOpen) {
+    const picker = itemOpen.closest("[data-item-picker]");
+    const input = picker && picker.querySelector("[data-item-search]");
+    if (input) {
+      input.focus();
+      if (typeof input.showPicker === "function") input.showPicker();
+    }
+  }
+
   startBackgroundMusic();
 });
 
 document.addEventListener("submit", (event) => {
   const form = event.target;
+  if (!validateItemPickers(form)) {
+    event.preventDefault();
+    return;
+  }
   const message = form.dataset.confirm;
   if (message && !window.confirm(message)) {
     event.preventDefault();
@@ -325,6 +340,54 @@ function updateLineTotal(row) {
   if (!output) return;
   const subtotal = quantity * rate;
   output.textContent = formatPreviewMoney(subtotal + subtotal * gst / 100);
+}
+
+function itemOptionLabel(option) {
+  return (option?.value || "").trim();
+}
+
+function initializeItemPickers(root = document) {
+  root.querySelectorAll("[data-item-picker]").forEach((picker) => {
+    if (picker.dataset.itemPickerReady === "true") return;
+    const input = picker.querySelector("[data-item-search]");
+    const datalist = picker.querySelector("[data-item-options]");
+    if (!input || !datalist) return;
+    const id = `item_options_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    datalist.id = id;
+    input.setAttribute("list", id);
+    picker.dataset.itemPickerReady = "true";
+    syncItemValue(input);
+  });
+}
+
+function matchingItemOption(input) {
+  const picker = input.closest("[data-item-picker]");
+  const datalist = picker && picker.querySelector("[data-item-options]");
+  if (!datalist) return null;
+  const value = input.value.trim().toLowerCase();
+  if (!value) return null;
+  return Array.from(datalist.options).find((option) => itemOptionLabel(option).toLowerCase() === value) || null;
+}
+
+function syncItemValue(input) {
+  const picker = input.closest("[data-item-picker]");
+  const hidden = picker && picker.querySelector("[data-item-value]");
+  if (!hidden) return false;
+  const option = matchingItemOption(input);
+  hidden.value = option ? option.dataset.itemId || "" : "";
+  input.setCustomValidity(input.value.trim() && !hidden.value ? "Select an item from the list." : "");
+  return Boolean(hidden.value);
+}
+
+function validateItemPickers(form) {
+  const inputs = Array.from(form.querySelectorAll("[data-item-search]"));
+  for (const input of inputs) {
+    if (!syncItemValue(input)) {
+      input.reportValidity();
+      return false;
+    }
+  }
+  return true;
 }
 
 function applyLiveSearch(input) {
@@ -426,6 +489,10 @@ document.addEventListener("input", (event) => {
     updateLineTotal(event.target.closest(".line-row"));
   }
 
+  if (event.target.matches("[data-item-search]")) {
+    syncItemValue(event.target);
+  }
+
   if (event.target.matches("[data-live-search]")) {
     applyLiveSearch(event.target);
   }
@@ -442,4 +509,5 @@ document.addEventListener("visibilitychange", () => {
 updateMusicControls();
 document.querySelectorAll("form").forEach(filterStockBooks);
 document.querySelectorAll(".line-row").forEach(updateLineTotal);
+initializeItemPickers();
 document.querySelectorAll("[data-live-search]").forEach(applyLiveSearch);

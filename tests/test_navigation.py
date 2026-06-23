@@ -200,6 +200,20 @@ def test_logged_entries_show_registered_user_name(client, app):
     assert b"Entry Operator" in report.data
 
 
+def test_item_lines_keep_dropdown_and_add_typing_search(client):
+    login(client)
+
+    response = client.get("/transactions/opening")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert 'data-item-search' in html
+    assert 'data-item-value' in html
+    assert 'name="item_id[]"' in html
+    assert 'data-item-open' in html
+    assert "Select or type item" in html
+
+
 def test_master_sidebar_marks_only_current_menu_active(client):
     login(client)
     response = client.get("/masters/items")

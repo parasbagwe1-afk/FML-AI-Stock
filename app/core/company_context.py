@@ -42,8 +42,8 @@ def company_theme(company):
     if not company:
         return {
             "body_class": "theme-default",
-            "app_name": "Company Login",
-            "tagline": "Select FirstTech or Aditya to continue",
+            "app_name": "FAstockFlow Owner",
+            "tagline": "Combined FirstTech and Aditya control",
         }
     return COMPANY_THEMES.get(company.code, COMPANY_THEMES["AI"])
 
@@ -86,6 +86,14 @@ def set_active_company_for_user(user):
 
 def user_has_fixed_company(user):
     return (getattr(user, "email", "") or "").strip().lower() in USER_COMPANY_CODES
+
+
+def user_can_view_all_companies(user):
+    return (
+        bool(getattr(user, "is_authenticated", False))
+        and getattr(user, "role", "") == "ADMIN"
+        and not user_has_fixed_company(user)
+    )
 
 
 def clear_active_company():

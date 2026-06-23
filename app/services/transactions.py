@@ -182,6 +182,21 @@ def _optional_opening_rate(value):
     return rate
 
 
+def _date_or_today(value, label):
+    return parse_date(value, label) if value else date.today()
+
+
+def _optional_due_date(value, label="Due date"):
+    return parse_date(value, label) if value else None
+
+
+def _opening_reference(value, prefix):
+    value = (value or "").strip()
+    if value:
+        return value
+    return f"{prefix}-{datetime.utcnow():%Y%m%d%H%M%S%f}"
+
+
 def create_opening_stock(data, lines, user):
     company = db.session.get(Company, int(data.get("company_id") or 0))
     if not company or not company.active:
@@ -195,10 +210,8 @@ def create_opening_stock(data, lines, user):
         raise ValueError("Stock book is required.")
     if stock_book.company_id != company.id:
         raise ValueError("The selected stock book belongs to a different company.")
-    opening_date = parse_date(data.get("opening_date"), "Opening date")
-    reference = data.get("reference_number", "").strip()
-    if not reference:
-        raise ValueError("Opening reference number is required.")
+    opening_date = _date_or_today(data.get("opening_date"), "Opening date")
+    reference = _opening_reference(data.get("reference_number"), "OPN-STK")
     opening = OpeningStock(
         company_id=company.id,
         stock_book_id=stock_book.id,
@@ -254,6 +267,113 @@ def create_opening_stock(data, lines, user):
             getattr(user, "id", None),
         )
     audit("create", "OpeningStock", opening.id, reference, user=user)
+    return opening
+
+
+def update_opening_stock(opening, data, lines, user):
+    _ensure_not_void(opening, "Opening stock")
+    consumed_layers = FIFOLayer.query.filter(
+        FIFOLayer.source_type == "OPENING_STOCK",
+        FIFOLayer.source_id == opening.id,
+        FIFOLayer.available_quantity != FIFOLayer.original_quantity,
+    ).count()
+    if consumed_layers:
+        raise ValueError("Opening stock cannot be edited after it has been consumed.")
+    company = db.session.get(Company, int(data.get("company_id") or opening.company_id))
+    if not company or not company.active:
+        raise ValueError("Company is required.")
+    stock_book = (
+        db.session.get(StockBook, int(data.get("stock_book_id") or 0))
+        if data.get("stock_book_id")
+        else _default_stock_book(company.id)
+    )
+    if not stock_book or not stock_book.active:
+        raise ValueError("Stock book is required.")
+    if stock_book.company_id != company.id:
+        raise ValueError("The selected stock book belongs to a different company.")
+
+    before = {
+        "company_id": opening.company_id,
+        "stock_book_id": opening.stock_book_id,
+        "reference_number": opening.reference_number,
+        "opening_date": opening.opening_date,
+    }
+    reference = _opening_reference(data.get("reference_number") or opening.reference_number, "OPN-STK")
+    opening_date = _date_or_today(data.get("opening_date"), "Opening date")
+
+    StockLedgerEntry.query.filter_by(transaction_type="OPENING_STOCK", transaction_id=opening.id).delete(
+        synchronize_session=False
+    )
+    FIFOLayer.query.filter_by(source_type="OPENING_STOCK", source_id=opening.id).delete(
+        synchronize_session=False
+    )
+    OpeningStockLine.query.filter_by(opening_stock_id=opening.id).delete(synchronize_session=False)
+
+    opening.company_id = company.id
+    opening.stock_book_id = stock_book.id
+    opening.reference_number = reference
+    opening.opening_date = opening_date
+    opening.remarks = data.get("remarks") or None
+    opening.updated_by_id = getattr(user, "id", None)
+
+    for row in _clean_lines(lines):
+        item = active_item(row.get("item_id"))
+        quantity = qty(row.get("quantity"))
+        if quantity == Decimal("0.000"):
+            raise ValueError("Quantity cannot be zero.")
+        rate = _optional_opening_rate(row.get("rate"))
+        line = OpeningStockLine(
+            opening_stock_id=opening.id,
+            item_id=item.id,
+            quantity=quantity,
+            rate=rate,
+            value=money(quantity * rate),
+            remarks=row.get("remarks") or None,
+        )
+        db.session.add(line)
+        db.session.flush()
+        if quantity > Decimal("0.000"):
+            create_fifo_layer(
+                company.id,
+                stock_book.id,
+                item.id,
+                "OPENING_STOCK",
+                opening.id,
+                line.id,
+                reference,
+                opening_date,
+                quantity,
+                rate,
+                getattr(user, "id", None),
+            )
+        stock_ledger(
+            company.id,
+            stock_book.id,
+            item.id,
+            opening_date,
+            "IN" if quantity > Decimal("0.000") else "OUT",
+            "OPENING_STOCK",
+            opening.id,
+            reference,
+            abs(quantity),
+            rate,
+            "Opening stock",
+            getattr(user, "id", None),
+        )
+    audit(
+        "edit",
+        "OpeningStock",
+        opening.id,
+        reference,
+        before=before,
+        after={
+            "company_id": opening.company_id,
+            "stock_book_id": opening.stock_book_id,
+            "reference_number": opening.reference_number,
+            "opening_date": opening.opening_date,
+        },
+        user=user,
+    )
     return opening
 
 
@@ -898,7 +1018,7 @@ def _validate_transfer_parties(data):
     mismatch = from_book.book_type != to_book.book_type
     if mismatch and not data.get("mismatch_approved"):
         raise ValueError("This transfer crosses GST and cash stock books and requires approval.")
-    transfer_date = parse_date(data.get("transfer_date"), "Transfer date")
+    transfer_date = _date_or_today(data.get("transfer_date"), "Transfer date")
     return from_company, to_company, from_book, to_book, reference, transfer_date
 
 
@@ -1395,7 +1515,7 @@ def update_transfer_header(transfer, data, user):
     reference = data.get("reference_number", "").strip()
     if not reference:
         raise ValueError("Transfer reference number is required.")
-    transfer_date = parse_date(data.get("transfer_date"), "Transfer date")
+    transfer_date = _date_or_today(data.get("transfer_date"), "Transfer date")
     mismatch_approved = bool(data.get("mismatch_approved"))
 
     before = {
@@ -1655,11 +1775,9 @@ def create_opening_receivable(data, user):
     )
     customer = active_customer(data.get("customer_id"))
     amount = positive_money(data.get("pending_amount"), "Pending amount")
-    document_date = parse_date(data.get("invoice_date"), "Invoice date")
-    due_date = parse_date(data.get("due_date"), "Due date")
-    number = data.get("reference_number", "").strip()
-    if not number:
-        raise ValueError("Old invoice/reference number is required.")
+    document_date = _date_or_today(data.get("invoice_date"), "Invoice date")
+    due_date = _optional_due_date(data.get("due_date"))
+    number = _opening_reference(data.get("reference_number"), "OPN-REC")
     receivable = Receivable(
         company_id=company.id,
         stock_book_id=stock_book.id,
@@ -1684,6 +1802,46 @@ def create_opening_receivable(data, user):
     return receivable
 
 
+def update_opening_receivable(receivable, data, user):
+    if not receivable.is_opening or receivable.source_type != "OPENING_RECEIVABLE":
+        raise ValueError("Only opening receivables can be edited from opening balances.")
+    if receivable.paid_amount:
+        raise ValueError("Opening receivable cannot be edited after receipt allocation.")
+    company = db.session.get(Company, int(data.get("company_id") or receivable.company_id))
+    if not company or not company.active:
+        raise ValueError("Company is required.")
+    stock_book_id = data.get("stock_book_id") or _default_stock_book(
+        company.id, data.get("sale_type") or receivable.transaction_type or "GST"
+    ).id
+    company, stock_book = validate_company_book(
+        company.id, stock_book_id, data.get("sale_type") or receivable.transaction_type, "sale"
+    )
+    customer = active_customer(data.get("customer_id") or receivable.customer_id)
+    amount = positive_money(data.get("pending_amount"), "Pending amount")
+    before = {
+        "company_id": receivable.company_id,
+        "customer_id": receivable.customer_id,
+        "document_number": receivable.document_number,
+        "document_date": receivable.document_date,
+        "due_date": receivable.due_date,
+        "total_amount": receivable.total_amount,
+    }
+    receivable.company_id = company.id
+    receivable.stock_book_id = stock_book.id
+    receivable.customer_id = customer.id
+    receivable.document_number = _opening_reference(data.get("reference_number"), "OPN-REC")
+    receivable.document_date = _date_or_today(data.get("invoice_date"), "Invoice date")
+    receivable.due_date = _optional_due_date(data.get("due_date"))
+    receivable.transaction_type = data.get("sale_type") or receivable.transaction_type
+    receivable.total_amount = amount
+    receivable.balance_amount = amount
+    receivable.payment_status = payment_status(amount, Decimal("0.00"))
+    receivable.remarks = data.get("remarks") or None
+    receivable.updated_by_id = getattr(user, "id", None)
+    audit("edit", "OpeningReceivable", receivable.id, receivable.document_number, before=before, user=user)
+    return receivable
+
+
 def create_opening_payable(data, user):
     company = db.session.get(Company, int(data.get("company_id") or 0))
     if not company or not company.active:
@@ -1696,11 +1854,9 @@ def create_opening_payable(data, user):
     )
     supplier = active_supplier(data.get("supplier_id"))
     amount = positive_money(data.get("pending_amount"), "Pending amount")
-    document_date = parse_date(data.get("bill_date"), "Bill date")
-    due_date = parse_date(data.get("due_date"), "Due date")
-    number = data.get("reference_number", "").strip()
-    if not number:
-        raise ValueError("Old bill/reference number is required.")
+    document_date = _date_or_today(data.get("bill_date"), "Bill date")
+    due_date = _optional_due_date(data.get("due_date"))
+    number = _opening_reference(data.get("reference_number"), "OPN-PAY")
     payable = Payable(
         company_id=company.id,
         stock_book_id=stock_book.id,
@@ -1725,6 +1881,46 @@ def create_opening_payable(data, user):
     return payable
 
 
+def update_opening_payable(payable, data, user):
+    if not payable.is_opening or payable.source_type != "OPENING_PAYABLE":
+        raise ValueError("Only opening payables can be edited from opening balances.")
+    if payable.paid_amount:
+        raise ValueError("Opening payable cannot be edited after payment allocation.")
+    company = db.session.get(Company, int(data.get("company_id") or payable.company_id))
+    if not company or not company.active:
+        raise ValueError("Company is required.")
+    stock_book_id = data.get("stock_book_id") or _default_stock_book(
+        company.id, data.get("purchase_type") or payable.transaction_type or "GST"
+    ).id
+    company, stock_book = validate_company_book(
+        company.id, stock_book_id, data.get("purchase_type") or payable.transaction_type, "purchase"
+    )
+    supplier = active_supplier(data.get("supplier_id") or payable.supplier_id)
+    amount = positive_money(data.get("pending_amount"), "Pending amount")
+    before = {
+        "company_id": payable.company_id,
+        "supplier_id": payable.supplier_id,
+        "document_number": payable.document_number,
+        "document_date": payable.document_date,
+        "due_date": payable.due_date,
+        "total_amount": payable.total_amount,
+    }
+    payable.company_id = company.id
+    payable.stock_book_id = stock_book.id
+    payable.supplier_id = supplier.id
+    payable.document_number = _opening_reference(data.get("reference_number"), "OPN-PAY")
+    payable.document_date = _date_or_today(data.get("bill_date"), "Bill date")
+    payable.due_date = _optional_due_date(data.get("due_date"))
+    payable.transaction_type = data.get("purchase_type") or payable.transaction_type
+    payable.total_amount = amount
+    payable.balance_amount = amount
+    payable.payment_status = payment_status(amount, Decimal("0.00"))
+    payable.remarks = data.get("remarks") or None
+    payable.updated_by_id = getattr(user, "id", None)
+    audit("edit", "OpeningPayable", payable.id, payable.document_number, before=before, user=user)
+    return payable
+
+
 def create_opening_advance_received(data, user):
     customer = active_customer(data.get("customer_id"))
     amount = positive_money(data.get("amount"), "Amount")
@@ -1733,7 +1929,7 @@ def create_opening_advance_received(data, user):
         payment_type="OPENING_ADVANCE_RECEIVED",
         party_type="CUSTOMER",
         customer_id=customer.id,
-        payment_date=parse_date(data.get("payment_date"), "Payment date"),
+        payment_date=_date_or_today(data.get("payment_date"), "Payment date"),
         mode=data.get("mode") or "CASH",
         reference_number=data.get("reference_number") or None,
         total_amount=amount,
@@ -1756,7 +1952,7 @@ def create_opening_advance_paid(data, user):
         payment_type="OPENING_ADVANCE_PAID",
         party_type="SUPPLIER",
         supplier_id=supplier.id,
-        payment_date=parse_date(data.get("payment_date"), "Payment date"),
+        payment_date=_date_or_today(data.get("payment_date"), "Payment date"),
         mode=data.get("mode") or "CASH",
         reference_number=data.get("reference_number") or None,
         total_amount=amount,
@@ -1768,4 +1964,44 @@ def create_opening_advance_paid(data, user):
     db.session.add(payment)
     db.session.flush()
     audit("create", "OpeningAdvancePaid", payment.id, payment.reference_number, user=user)
+    return payment
+
+
+def update_opening_advance(payment, data, user):
+    if not payment.payment_type.startswith("OPENING_ADVANCE"):
+        raise ValueError("Only opening advances can be edited from opening balances.")
+    if payment.allocated_amount:
+        raise ValueError("Opening advance cannot be edited after allocation.")
+    company = db.session.get(Company, int(data.get("company_id") or payment.company_id))
+    if not company or not company.active:
+        raise ValueError("Company is required.")
+    before = {
+        "company_id": payment.company_id,
+        "payment_type": payment.payment_type,
+        "customer_id": payment.customer_id,
+        "supplier_id": payment.supplier_id,
+        "payment_date": payment.payment_date,
+        "total_amount": payment.total_amount,
+    }
+    amount = positive_money(data.get("amount"), "Amount")
+    payment.company_id = company.id
+    if payment.payment_type == "OPENING_ADVANCE_RECEIVED":
+        customer = active_customer(data.get("customer_id") or payment.customer_id)
+        payment.party_type = "CUSTOMER"
+        payment.customer_id = customer.id
+        payment.supplier_id = None
+    else:
+        supplier = active_supplier(data.get("supplier_id") or payment.supplier_id)
+        payment.party_type = "SUPPLIER"
+        payment.supplier_id = supplier.id
+        payment.customer_id = None
+    payment.payment_date = _date_or_today(data.get("payment_date"), "Payment date")
+    payment.mode = data.get("mode") or payment.mode or "CASH"
+    payment.reference_number = data.get("reference_number") or None
+    payment.total_amount = amount
+    payment.allocated_amount = Decimal("0.00")
+    payment.unallocated_amount = amount
+    payment.remarks = data.get("remarks") or None
+    payment.updated_by_id = getattr(user, "id", None)
+    audit("edit", "OpeningAdvance", payment.id, payment.reference_number, before=before, user=user)
     return payment

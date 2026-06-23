@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% set title_map = {
+  'stock': 'Opening Stock',
+  'receivable': 'Opening Customer Receivable',
+  'payable': 'Opening Supplier Payable',
+  'advance': 'Opening Advance'
+} %}
+{% block page_title %}Edit {{ title_map.get(section, 'Opening Balance') }}{% endblock %}
+{% block page_subtitle %}Update opening balance details before allocations or stock consumption lock the entry.{% endblock %}
+{% block content %}
+  <section class="panel">
+    <form method="post" class="form-grid wide">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if section == 'stock' %}
+        <label>Company
+          <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if record.company_id == company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select>
+        </label>
+        <label>Reference <input name="reference_number" value="{{ record.reference_number }}"></label>
+        <label>Opening date <input name="opening_date" type="date" value="{{ record.opening_date or '' }}"></label>
+        <label class="full-span">Remarks <textarea name="remarks">{{ record.remarks or '' }}</textarea></label>
+        <div class="full-span">
+          <div class="line-grid transfer" data-line-grid>
+            <div class="line-grid-head">
+              <span>Item</span><span>Quantity</span><span></span>
+            </div>
+            {% for line in record.lines %}
+              <div class="line-row opening-line">
+                <select name="item_id[]" required>
+                  <option value="">Select item</option>
+                  {% for item in items %}
+                    <option value="{{ item.id }}" {% if line.item_id == item.id %}selected{% endif %}>{{ item.display_name }}</option>
+                  {% endfor %}
+                </select>
+                <input name="quantity[]" type="number" step="0.001" value="{{ line.quantity }}" required>
+                <input name="rate[]" type="hidden" value="{{ line.rate }}">
+                <button type="button" class="icon-button" data-remove-line>×</button>
+              </div>
+            {% endfor %}
+          </div>
+          <button type="button" class="secondary-button" data-add-line>Add line</button>
+        </div>
+      {% elif section == 'receivable' %}
+        <label>Company
+          <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if record.company_id == company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select>
+        </label>
+        <label>Customer
+          <select name="customer_id" required>{% for customer in customers %}<option value="{{ customer.id }}" {% if record.customer_id == customer.id %}selected{% endif %}>{{ customer.code }} - {{ customer.name }}</option>{% endfor %}</select>
+        </label>
+        <label>Sale type <select name="sale_type"><option value="GST" {% if record.transaction_type != 'CASH' %}selected{% endif %}>GST</option><option value="CASH" {% if record.transaction_type == 'CASH' %}selected{% endif %}>CASH</option></select></label>
+        <label>Old invoice/ref <input name="reference_number" value="{{ record.document_number }}"></label>
+        <label>Invoice date <input name="invoice_date" type="date" value="{{ record.document_date or '' }}"></label>
+        <label>Due date <input name="due_date" type="date" value="{{ record.due_date or '' }}"></label>
+        <label>Pending amount <input name="pending_amount" type="number" step="0.01" min="0" value="{{ record.total_amount }}" required></label>
+        <label class="full-span">Remarks <textarea name="remarks">{{ record.remarks or '' }}</textarea></label>
+      {% elif section == 'payable' %}
+        <label>Company
+          <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if record.company_id == company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select>
+        </label>
+        <label>Supplier
+          <select name="supplier_id" required>{% for supplier in suppliers %}<option value="{{ supplier.id }}" {% if record.supplier_id == supplier.id %}selected{% endif %}>{{ supplier.code }} - {{ supplier.name }}</option>{% endfor %}</select>
+        </label>
+        <label>Purchase type <select name="purchase_type"><option value="GST" {% if record.transaction_type != 'CASH' %}selected{% endif %}>GST</option><option value="CASH" {% if record.transaction_type == 'CASH' %}selected{% endif %}>CASH</option></select></label>
+        <label>Old bill/ref <input name="reference_number" value="{{ record.document_number }}"></label>
+        <label>Bill date <input name="bill_date" type="date" value="{{ record.document_date or '' }}"></label>
+        <label>Due date <input name="due_date" type="date" value="{{ record.due_date or '' }}"></label>
+        <label>Pending amount <input name="pending_amount" type="number" step="0.01" min="0" value="{{ record.total_amount }}" required></label>
+        <label class="full-span">Remarks <textarea name="remarks">{{ record.remarks or '' }}</textarea></label>
+      {% elif section == 'advance' %}
+        <label>Company
+          <select name="company_id" required>{% for company in companies %}<option value="{{ company.id }}" {% if record.company_id == company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>{% endfor %}</select>
+        </label>
+        {% if record.payment_type == 'OPENING_ADVANCE_RECEIVED' %}
+          <label>Customer
+            <select name="customer_id" required>{% for customer in customers %}<option value="{{ customer.id }}" {% if record.customer_id == customer.id %}selected{% endif %}>{{ customer.code }} - {{ customer.name }}</option>{% endfor %}</select>
+          </label>
+        {% else %}
+          <label>Supplier
+            <select name="supplier_id" required>{% for supplier in suppliers %}<option value="{{ supplier.id }}" {% if record.supplier_id == supplier.id %}selected{% endif %}>{{ supplier.code }} - {{ supplier.name }}</option>{% endfor %}</select>
+          </label>
+        {% endif %}
+        <label>Payment date <input name="payment_date" type="date" value="{{ record.payment_date or '' }}"></label>
+        <label>Mode <select name="mode">{% for mode in payment_modes %}<option value="{{ mode.code }}" {% if record.mode == mode.code %}selected{% endif %}>{{ mode.name }}</option>{% endfor %}</select></label>
+        <label>Reference <input name="reference_number" value="{{ record.reference_number or '' }}"></label>
+        <label>Amount <input name="amount" type="number" step="0.01" min="0" value="{{ record.total_amount }}" required></label>
+        <label class="full-span">Remarks <textarea name="remarks">{{ record.remarks or '' }}</textarea></label>
+      {% endif %}
+      <div class="form-actions full-span">
+        <a class="secondary-button" href="{{ url_for('transactions.opening') }}">Cancel</a>
+        <button class="primary-button" type="submit">Save Changes</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}

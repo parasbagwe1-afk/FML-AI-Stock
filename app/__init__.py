@@ -46,7 +46,7 @@ def create_app(config_object=None):
 def register_company_gate(app):
     from flask_login import current_user
 
-    from app.core.company_context import active_company, set_active_company_for_user
+    from app.core.company_context import active_company, set_active_company_for_user, user_can_view_all_companies
 
     @app.before_request
     def require_company_context():
@@ -59,6 +59,8 @@ def register_company_gate(app):
         if active_company():
             return None
         if set_active_company_for_user(current_user):
+            return None
+        if user_can_view_all_companies(current_user):
             return None
         next_url = request.full_path if request.query_string else request.path
         return redirect(url_for("company.choose", next=next_url))
@@ -93,14 +95,20 @@ def register_template_helpers(app):
                 return None
             today = date.today()
             upcoming = today + timedelta(days=7)
+            selected = active_company()
             receivables = Receivable.query.filter(
                 Receivable.balance_amount > 0,
                 Receivable.due_date <= upcoming,
-            ).count()
+            )
             payables = Payable.query.filter(
                 Payable.balance_amount > 0,
                 Payable.due_date <= upcoming,
-            ).count()
+            )
+            if selected:
+                receivables = receivables.filter(Receivable.company_id == selected.id)
+                payables = payables.filter(Payable.company_id == selected.id)
+            receivables = receivables.count()
+            payables = payables.count()
             return receivables + payables
 
         selected_company = active_company() if current_user.is_authenticated else None

@@ -64,6 +64,34 @@ def test_admin_login_is_not_a_fastockflow_login(client):
     assert b"Aditya International" in response.data
 
 
+def test_company_login_shows_invalid_password_message(client):
+    response = login(client, "adityainternational.user", "wrong-password")
+    assert response.status_code == 200
+    assert b"Invalid login ID or password." in response.data
+
+
+def test_owner_admin_login_opens_combined_dashboard(client):
+    response = client.post(
+        "/admin/login",
+        data={"email": "admin@fastockflow.local", "password": "ChangeMe123!"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"All Companies" in response.data
+    assert b"Combined FirstTech and Aditya control" in response.data
+    assert b"Choose Company" not in response.data
+
+
+def test_owner_admin_login_shows_invalid_password_message(client):
+    response = client.post(
+        "/admin/login",
+        data={"email": "admin@fastockflow.local", "password": "wrong-password"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Invalid admin login ID or password." in response.data
+
+
 def test_login_page_has_direct_company_options(client):
     response = client.get("/login")
     assert response.status_code == 200

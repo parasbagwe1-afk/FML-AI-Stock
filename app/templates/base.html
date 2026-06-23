@@ -12,7 +12,7 @@
       <div class="app-shell">
         <aside class="sidebar">
           <a class="brand" href="{{ url_for('dashboard.index') }}">
-            <span class="brand-mark logo-mark company-brand-mark"><img src="{{ url_for('static', filename=company_logo(active_company), v=asset_version) }}" alt="{{ active_company.name }}"></span>
+            <span class="brand-mark logo-mark company-brand-mark"><img src="{{ url_for('static', filename=company_logo(active_company), v=asset_version) }}" alt="{{ active_company.name if active_company else active_company_theme.app_name }}"></span>
             <span>
               <strong>{{ active_company_theme.app_name }}</strong>
               <small>{{ active_company_theme.tagline }}</small>
@@ -56,6 +56,13 @@
                 </form>
               {% endif %}
             {% endfor %}
+            {% if not user_fixed_company %}
+              <form method="post" action="{{ url_for('company.all_companies') }}" class="footer-company-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="next" value="{{ url_for('dashboard.index') }}">
+                <button class="footer-link {{ 'active' if not active_company else '' }}" type="submit">All companies</button>
+              </form>
+            {% endif %}
             <form action="{{ url_for('auth.logout') }}" method="post">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="ghost-button full" type="submit">Logout</button>
@@ -73,6 +80,11 @@
                 <div class="company-chip">
                   <img src="{{ url_for('static', filename=company_logo(active_company), v=asset_version) }}" alt="">
                   <span>{{ active_company.name }}</span>
+                </div>
+              {% else %}
+                <div class="company-chip">
+                  <img src="{{ url_for('static', filename='img/fastockflow-icon.png', v=asset_version) }}" alt="">
+                  <span>All companies</span>
                 </div>
               {% endif %}
               <div class="music-control" data-music-control>

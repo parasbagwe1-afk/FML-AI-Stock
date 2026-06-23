@@ -1,3 +1,5 @@
+from datetime import date
+
 from app.models import (
     FIFOLayer,
     InterCompanyLedgerEntry,
@@ -202,6 +204,9 @@ def test_opening_summary_can_delete_receivable_payable_and_advance(client, app):
     assert "/transactions/opening/receivable/" in html
     assert "/transactions/opening/payable/" in html
     assert "/transactions/opening/advance/" in html
+    assert "/transactions/opening/receivable/" in html and "/edit" in html
+    assert "/transactions/opening/payable/" in html and "/edit" in html
+    assert "/transactions/opening/advance/" in html and "/edit" in html
 
     with app.app_context():
         receivable = Receivable.query.filter_by(document_number="OPEN-REC-DELETE").one()
@@ -236,3 +241,54 @@ def test_opening_summary_can_delete_receivable_payable_and_advance(client, app):
         assert Receivable.query.filter_by(document_number="OPEN-REC-DELETE").count() == 0
         assert Payable.query.filter_by(document_number="OPEN-PAY-DELETE").count() == 0
         assert Payment.query.filter_by(reference_number="OPEN-ADV-DELETE").count() == 0
+
+
+def test_opening_receivable_dates_are_optional_and_entry_can_be_edited(client, app):
+    with app.app_context():
+        data = ids()
+        company_id = data["ai"].id
+        customer_id = data["customer"].id
+
+    login(client)
+    response = client.post(
+        "/transactions/opening/receivable",
+        data={
+            "company_id": company_id,
+            "customer_id": customer_id,
+            "sale_type": "GST",
+            "reference_number": "",
+            "invoice_date": "",
+            "due_date": "",
+            "pending_amount": "1500",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Opening receivable OPN-REC-" in response.data
+
+    with app.app_context():
+        receivable = Receivable.query.filter(Receivable.document_number.like("OPN-REC-%")).one()
+        receivable_id = receivable.id
+        assert receivable.document_date == date.today()
+        assert receivable.due_date is None
+
+    response = client.post(
+        f"/transactions/opening/receivable/{receivable_id}/edit",
+        data={
+            "company_id": company_id,
+            "customer_id": customer_id,
+            "sale_type": "GST",
+            "reference_number": "OPEN-REC-EDITED",
+            "invoice_date": "",
+            "due_date": "",
+            "pending_amount": "2500",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"Opening receivable updated." in response.data
+
+    with app.app_context():
+        receivable = Receivable.query.filter_by(document_number="OPEN-REC-EDITED").one()
+        assert receivable.total_amount == 2500
+        assert receivable.balance_amount == 2500

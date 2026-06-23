@@ -35,6 +35,10 @@ from app.services.transactions import (
     delete_opening_payable,
     delete_opening_receivable,
     pending_transfer_summary,
+    update_opening_advance,
+    update_opening_payable,
+    update_opening_receivable,
+    update_opening_stock,
     update_purchase_header,
     update_purchase_lines,
     update_sale_header,
@@ -392,6 +396,29 @@ def opening_stock_delete(opening_id):
     return redirect(url_for("transactions.opening"))
 
 
+@bp.route("/opening/stock/<int:opening_id>/edit", methods=["GET", "POST"])
+@login_required
+def opening_stock_edit(opening_id):
+    if not (can(current_user, "opening", "edit") or can(current_user, "opening", "create")):
+        abort(403)
+    opening = db.session.get(OpeningStock, opening_id)
+    if not opening:
+        flash("Opening stock not found.", "danger")
+        return redirect(url_for("transactions.opening"))
+    require_active_company_document(opening.company_id)
+    if request.method == "POST":
+        try:
+            require_active_company_value(request.form.get("company_id") or opening.company_id)
+            update_opening_stock(opening, request.form, item_lines_from_form(request.form), current_user)
+            db.session.commit()
+            flash("Opening stock updated.", "success")
+            return redirect(url_for("transactions.opening"))
+        except Exception as exc:
+            db.session.rollback()
+            flash(str(exc), "danger")
+    return render_template("transactions/opening_edit.html", section="stock", record=opening, **options(scope_to_active_company=True))
+
+
 @bp.route("/opening/receivable/<int:receivable_id>/delete", methods=["POST"])
 @login_required
 def opening_receivable_delete(receivable_id):
@@ -401,6 +428,7 @@ def opening_receivable_delete(receivable_id):
     if not receivable:
         flash("Opening receivable not found.", "danger")
         return redirect(url_for("transactions.opening"))
+    require_active_company_document(receivable.company_id)
     try:
         delete_opening_receivable(receivable, current_user)
         db.session.commit()
@@ -409,6 +437,29 @@ def opening_receivable_delete(receivable_id):
         db.session.rollback()
         flash(str(exc), "danger")
     return redirect(url_for("transactions.opening"))
+
+
+@bp.route("/opening/receivable/<int:receivable_id>/edit", methods=["GET", "POST"])
+@login_required
+def opening_receivable_edit(receivable_id):
+    if not (can(current_user, "opening", "edit") or can(current_user, "opening", "create")):
+        abort(403)
+    receivable = db.session.get(Receivable, receivable_id)
+    if not receivable:
+        flash("Opening receivable not found.", "danger")
+        return redirect(url_for("transactions.opening"))
+    require_active_company_document(receivable.company_id)
+    if request.method == "POST":
+        try:
+            require_active_company_value(request.form.get("company_id") or receivable.company_id)
+            update_opening_receivable(receivable, request.form, current_user)
+            db.session.commit()
+            flash("Opening receivable updated.", "success")
+            return redirect(url_for("transactions.opening"))
+        except Exception as exc:
+            db.session.rollback()
+            flash(str(exc), "danger")
+    return render_template("transactions/opening_edit.html", section="receivable", record=receivable, **options(scope_to_active_company=True))
 
 
 @bp.route("/opening/payable/<int:payable_id>/delete", methods=["POST"])
@@ -420,6 +471,7 @@ def opening_payable_delete(payable_id):
     if not payable:
         flash("Opening payable not found.", "danger")
         return redirect(url_for("transactions.opening"))
+    require_active_company_document(payable.company_id)
     try:
         delete_opening_payable(payable, current_user)
         db.session.commit()
@@ -428,6 +480,29 @@ def opening_payable_delete(payable_id):
         db.session.rollback()
         flash(str(exc), "danger")
     return redirect(url_for("transactions.opening"))
+
+
+@bp.route("/opening/payable/<int:payable_id>/edit", methods=["GET", "POST"])
+@login_required
+def opening_payable_edit(payable_id):
+    if not (can(current_user, "opening", "edit") or can(current_user, "opening", "create")):
+        abort(403)
+    payable = db.session.get(Payable, payable_id)
+    if not payable:
+        flash("Opening payable not found.", "danger")
+        return redirect(url_for("transactions.opening"))
+    require_active_company_document(payable.company_id)
+    if request.method == "POST":
+        try:
+            require_active_company_value(request.form.get("company_id") or payable.company_id)
+            update_opening_payable(payable, request.form, current_user)
+            db.session.commit()
+            flash("Opening payable updated.", "success")
+            return redirect(url_for("transactions.opening"))
+        except Exception as exc:
+            db.session.rollback()
+            flash(str(exc), "danger")
+    return render_template("transactions/opening_edit.html", section="payable", record=payable, **options(scope_to_active_company=True))
 
 
 @bp.route("/opening/advance/<int:payment_id>/delete", methods=["POST"])
@@ -439,6 +514,7 @@ def opening_advance_delete(payment_id):
     if not payment:
         flash("Opening advance not found.", "danger")
         return redirect(url_for("transactions.opening"))
+    require_active_company_document(payment.company_id)
     try:
         delete_opening_advance(payment, current_user)
         db.session.commit()
@@ -447,3 +523,26 @@ def opening_advance_delete(payment_id):
         db.session.rollback()
         flash(str(exc), "danger")
     return redirect(url_for("transactions.opening"))
+
+
+@bp.route("/opening/advance/<int:payment_id>/edit", methods=["GET", "POST"])
+@login_required
+def opening_advance_edit(payment_id):
+    if not (can(current_user, "opening", "edit") or can(current_user, "opening", "create")):
+        abort(403)
+    payment = db.session.get(Payment, payment_id)
+    if not payment:
+        flash("Opening advance not found.", "danger")
+        return redirect(url_for("transactions.opening"))
+    require_active_company_document(payment.company_id)
+    if request.method == "POST":
+        try:
+            require_active_company_value(request.form.get("company_id") or payment.company_id)
+            update_opening_advance(payment, request.form, current_user)
+            db.session.commit()
+            flash("Opening advance updated.", "success")
+            return redirect(url_for("transactions.opening"))
+        except Exception as exc:
+            db.session.rollback()
+            flash(str(exc), "danger")
+    return render_template("transactions/opening_edit.html", section="advance", record=payment, **options(scope_to_active_company=True))

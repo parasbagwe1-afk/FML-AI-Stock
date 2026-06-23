@@ -1,5 +1,6 @@
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.exc import IntegrityError
 
 from app.core.formatting import dec, qty
 from app.core.security import require_permission
@@ -104,6 +105,7 @@ def create_record(kind):
     if request.method == "POST":
         try:
             apply_form(record, kind)
+            ensure_unique_code(record, kind)
             record.created_by_id = current_user.id
             db.session.add(record)
             db.session.flush()
@@ -111,6 +113,9 @@ def create_record(kind):
             db.session.commit()
             flash(f"{config['title'][:-1]} saved.", "success")
             return redirect(url_for("masters.list_records", kind=kind))
+        except IntegrityError as exc:
+            db.session.rollback()
+            flash(friendly_integrity_error(kind, exc), "danger")
         except Exception as exc:
             db.session.rollback()
             flash(str(exc), "danger")
@@ -130,11 +135,15 @@ def edit_record(kind, record_id):
         try:
             before = snapshot(record)
             apply_form(record, kind)
+            ensure_unique_code(record, kind)
             record.updated_by_id = current_user.id
             audit("edit", config["title"], record.id, getattr(record, "code", None), before=before, after=snapshot(record), user=current_user)
             db.session.commit()
             flash(f"{config['title'][:-1]} updated.", "success")
             return redirect(url_for("masters.list_records", kind=kind))
+        except IntegrityError as exc:
+            db.session.rollback()
+            flash(friendly_integrity_error(kind, exc), "danger")
         except Exception as exc:
             db.session.rollback()
             flash(str(exc), "danger")
@@ -164,6 +173,31 @@ def snapshot(record):
     for column in record.__table__.columns:
         values[column.name] = getattr(record, column.name)
     return values
+
+
+def singular_title(kind):
+    config = MASTER_CONFIG[kind]
+    return config["title"][:-1] if config["title"].endswith("s") else config["title"]
+
+
+def ensure_unique_code(record, kind):
+    if not getattr(record, "code", None):
+        return
+    model = MASTER_CONFIG[kind]["model"]
+    query = model.query.filter(model.code == record.code)
+    if getattr(record, "id", None):
+        query = query.filter(model.id != record.id)
+    if query.first():
+        raise ValueError(f"{singular_title(kind)} code '{record.code}' already exists. Use a different code or edit the existing record.")
+
+
+def friendly_integrity_error(kind, exc):
+    message = str(getattr(exc, "orig", exc))
+    if "Duplicate entry" in message or "UNIQUE constraint failed" in message:
+        code = (request.form.get("code") or "").strip()
+        detail = f" code '{code}'" if code else ""
+        return f"{singular_title(kind)}{detail} already exists. Use a different code or edit the existing record."
+    return "This record could not be saved because it conflicts with existing data."
 
 
 def apply_form(record, kind):

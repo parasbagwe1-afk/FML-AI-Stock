@@ -316,24 +316,91 @@ def gross_profit_rows():
     return headers, rows
 
 
-def customer_outstanding_rows():
-    headers = ["Company", "Customer", "Document", "Date", "Due date", "Total", "Paid", "Balance", "Status", "Created by"]
+def outstanding_status(total, paid, balance):
+    balance = money(balance)
+    paid = money(paid)
+    if balance <= Decimal("0.00"):
+        return "PAID"
+    if paid > Decimal("0.00"):
+        return "PARTIAL"
+    return "UNPAID"
+
+
+def document_summary(documents):
+    documents = [document for document in documents if document]
+    if len(documents) == 1:
+        return documents[0]
+    return f"{len(documents)} documents"
+
+
+def created_by_summary(user_ids):
+    names = {creator_name(user_id) for user_id in user_ids}
+    if len(names) == 1:
+        return names.pop()
+    return "Multiple users"
+
+
+def grouped_outstanding_rows(query, party_kind):
+    model = Receivable if party_kind == "customer" else Payable
+    groups = {}
+    for entry in query.order_by(model.due_date, model.document_number).all():
+        if party_kind == "customer":
+            party = entry.customer.name if entry.customer else entry.counterparty_company.name if entry.counterparty_company else ""
+            party_id = entry.customer_id or entry.counterparty_company_id
+        else:
+            party = entry.supplier.name if entry.supplier else entry.counterparty_company.name if entry.counterparty_company else ""
+            party_id = entry.supplier_id or entry.counterparty_company_id
+        key = (entry.company_id, party_kind, party_id, party)
+        group = groups.setdefault(
+            key,
+            {
+                "company": entry.company.code,
+                "party": party,
+                "documents": [],
+                "date": entry.document_date,
+                "due_date": entry.due_date,
+                "total": Decimal("0.00"),
+                "paid": Decimal("0.00"),
+                "balance": Decimal("0.00"),
+                "created_by": set(),
+            },
+        )
+        group["documents"].append(entry.document_number)
+        group["date"] = min(group["date"], entry.document_date)
+        if entry.due_date and (not group["due_date"] or entry.due_date < group["due_date"]):
+            group["due_date"] = entry.due_date
+        group["total"] = money(group["total"] + entry.total_amount)
+        group["paid"] = money(group["paid"] + entry.paid_amount)
+        group["balance"] = money(group["balance"] + entry.balance_amount)
+        group["created_by"].add(entry.created_by_id)
+
     rows = []
+    for group in sorted(groups.values(), key=lambda item: (item["due_date"] or date.max, item["party"])):
+        rows.append([
+            group["company"],
+            group["party"],
+            document_summary(group["documents"]),
+            group["date"],
+            group["due_date"] or "",
+            fmt_money(group["total"]),
+            fmt_money(group["paid"]),
+            fmt_money(group["balance"]),
+            outstanding_status(group["total"], group["paid"], group["balance"]),
+            created_by_summary(group["created_by"]),
+        ])
+    return rows
+
+
+def customer_outstanding_rows():
+    headers = ["Company", "Customer", "Documents", "First date", "Next due", "Total", "Paid", "Balance", "Status", "Created by"]
     query = scope_query_to_active_company(Receivable.query, Receivable.company_id)
-    for rec in query.order_by(Receivable.due_date, Receivable.document_number).all():
-        party = rec.customer.name if rec.customer else rec.counterparty_company.name
-        rows.append([rec.company.code, party, rec.document_number, rec.document_date, rec.due_date or "", fmt_money(rec.total_amount), fmt_money(rec.paid_amount), fmt_money(rec.balance_amount), rec.payment_status, creator_name(rec.created_by_id)])
-    return headers, rows
+    return headers, grouped_outstanding_rows(query, "customer")
 
 
 def supplier_outstanding_rows():
-    headers = ["Company", "Supplier", "Document", "Date", "Due date", "Total", "Paid", "Balance", "Status", "Created by"]
-    rows = []
+    headers = ["Company", "Supplier", "Documents", "First date", "Next due", "Total", "Paid", "Balance", "Status", "Created by"]
     query = scope_query_to_active_company(Payable.query, Payable.company_id)
-    for pay in query.order_by(Payable.due_date, Payable.document_number).all():
-        party = pay.supplier.name if pay.supplier else pay.counterparty_company.name
-        rows.append([pay.company.code, party, pay.document_number, pay.document_date, pay.due_date or "", fmt_money(pay.total_amount), fmt_money(pay.paid_amount), fmt_money(pay.balance_amount), pay.payment_status, creator_name(pay.created_by_id)])
-    return headers, rows
+    return headers, grouped_outstanding_rows(query, "supplier")
 
 
 def advances_rows():

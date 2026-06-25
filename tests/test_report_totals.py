@@ -86,6 +86,7 @@ def test_outstanding_page_groups_customer_once_per_company(client, app):
     assert html.count(customer_name) == 1
     assert "2 documents" in html
     assert "₹354.00" in html
+    assert "/finance/outstanding/customer/" in html
 
 
 def test_outstanding_page_groups_supplier_once_per_company(client, app):
@@ -115,6 +116,96 @@ def test_outstanding_page_groups_supplier_once_per_company(client, app):
     assert html.count(supplier_name) == 1
     assert "2 documents" in html
     assert "₹354.00" in html
+    assert "/finance/outstanding/supplier/" in html
+
+
+def test_outstanding_customer_detail_shows_bill_dates_and_edit_links(client, app):
+    with app.app_context():
+        data = ids()
+        sale = create_sale(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "customer_id": data["customer"].id,
+                "sale_type": "GST",
+                "invoice_number": "DETAIL-CUST-INV",
+                "invoice_date": "2026-06-23",
+                "due_date": "2026-06-30",
+            },
+            [{"item_id": data["item"].id, "quantity": "1", "rate": "100", "gst_percent": "18"}],
+            admin(),
+        )
+        company_id = data["ai"].id
+        customer_id = data["customer"].id
+        sale_id = sale.id
+        db.session.commit()
+
+    login(client)
+    response = client.get(f"/finance/outstanding/customer/{company_id}/{customer_id}")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "DETAIL-CUST-INV" in html
+    assert "2026-06-23" in html
+    assert "2026-06-30" in html
+    assert f"/transactions/sale/{sale_id}/edit" in html
+
+
+def test_outstanding_supplier_detail_shows_bill_dates_and_edit_links(client, app):
+    with app.app_context():
+        data = ids()
+        purchase = create_purchase(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "supplier_id": data["supplier"].id,
+                "purchase_type": "GST",
+                "bill_number": "DETAIL-SUP-BILL",
+                "bill_date": "2026-06-23",
+                "due_date": "2026-06-30",
+            },
+            [{"item_id": data["item"].id, "quantity": "1", "rate": "100", "gst_percent": "18"}],
+            admin(),
+        )
+        company_id = data["ai"].id
+        supplier_id = data["supplier"].id
+        purchase_id = purchase.id
+        db.session.commit()
+
+    login(client)
+    response = client.get(f"/finance/outstanding/supplier/{company_id}/{supplier_id}")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "DETAIL-SUP-BILL" in html
+    assert "2026-06-23" in html
+    assert "2026-06-30" in html
+    assert f"/transactions/purchase/{purchase_id}/edit" in html
+
+
+def test_outstanding_detail_respects_fixed_company_scope(client, app):
+    with app.app_context():
+        data = ids()
+        create_sale(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "customer_id": data["customer"].id,
+                "sale_type": "GST",
+                "invoice_number": "DETAIL-SCOPE-INV",
+                "invoice_date": "2026-06-23",
+            },
+            [{"item_id": data["item"].id, "quantity": "1", "rate": "100", "gst_percent": "18"}],
+            admin(),
+        )
+        company_id = data["ai"].id
+        customer_id = data["customer"].id
+        db.session.commit()
+
+    login(client, "firsttech.user", "Firsttech2026")
+    response = client.get(f"/finance/outstanding/customer/{company_id}/{customer_id}")
+
+    assert response.status_code == 403
 
 
 def test_customer_outstanding_report_groups_customer_once_per_company(client, app):

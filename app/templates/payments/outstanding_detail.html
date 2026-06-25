@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block page_subtitle %}{{ company.name }} · {{ party_label }}: {{ party_name }}{% endblock %}
+{% block content %}
+  <section class="panel">
+    <form class="toolbar" method="get">
+      <a class="secondary-button" href="{{ back_url }}">Outstanding</a>
+    </form>
+  </section>
+
+  <section class="metric-grid">
+    <article class="metric-card">
+      <span>Documents</span>
+      <strong>{{ summary.count }}</strong>
+      <small>Bills and opening entries</small>
+    </article>
+    <article class="metric-card">
+      <span>Total</span>
+      <strong>{{ fmt_money(summary.total) }}</strong>
+      <small>Original bill value</small>
+    </article>
+    <article class="metric-card amber">
+      <span>Paid</span>
+      <strong>{{ fmt_money(summary.paid) }}</strong>
+      <small>Amount received/paid</small>
+    </article>
+    <article class="metric-card">
+      <span>Balance</span>
+      <strong>{{ fmt_money(summary.balance) }}</strong>
+      <small>Current outstanding</small>
+    </article>
+  </section>
+
+  <section class="panel">
+    <div class="panel-title">
+      <h2>Bill Details</h2>
+      <span class="muted-copy">Every document for {{ party_name }}</span>
+    </div>
+    <div class="table-wrap tall">
+      <table>
+        <thead>
+          <tr><th>Document</th><th>Date</th><th>Due</th><th>Type</th><th>Source</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th>Remarks</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td>{{ row.document }}</td>
+              <td>{{ row.date }}</td>
+              <td>{{ row.due_date or '' }}</td>
+              <td>{{ row.type }}</td>
+              <td>{{ row.source }}</td>
+              <td>{{ fmt_money(row.total) }}</td>
+              <td>{{ fmt_money(row.paid) }}</td>
+              <td>{{ fmt_money(row.balance) }}</td>
+              <td>{{ row.status }}</td>
+              <td>{{ row.remarks }}</td>
+              <td>{% if row.edit_url %}<a class="table-action" href="{{ row.edit_url }}">Edit</a>{% else %}<span class="muted-copy">Locked</span>{% endif %}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="11" class="empty">No bill details found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

@@ -44,6 +44,70 @@ def require_active_company_document(company_id):
         abort(403)
 
 
+def receivable_edit_url(receivable):
+    if receivable.source_type == "SALE":
+        return url_for("transactions.sale_edit", sale_id=receivable.source_id)
+    if receivable.source_type == "OPENING_RECEIVABLE":
+        return url_for("transactions.opening_receivable_edit", receivable_id=receivable.id)
+    return None
+
+
+def payable_edit_url(payable):
+    if payable.source_type == "PURCHASE":
+        return url_for("transactions.purchase_edit", purchase_id=payable.source_id)
+    if payable.source_type == "OPENING_PAYABLE":
+        return url_for("transactions.opening_payable_edit", payable_id=payable.id)
+    return None
+
+
+def receivable_detail_rows(company_id, customer_id):
+    rows = (
+        Receivable.query.filter_by(company_id=company_id, customer_id=customer_id)
+        .order_by(Receivable.document_date, Receivable.document_number, Receivable.id)
+        .all()
+    )
+    return [
+        {
+            "document": row.document_number,
+            "date": row.document_date,
+            "due_date": row.due_date,
+            "type": row.transaction_type or row.source_type,
+            "source": "Opening" if row.is_opening else row.source_type.title(),
+            "total": row.total_amount,
+            "paid": row.paid_amount,
+            "balance": row.balance_amount,
+            "status": row.payment_status,
+            "remarks": row.remarks or "",
+            "edit_url": receivable_edit_url(row),
+        }
+        for row in rows
+    ]
+
+
+def payable_detail_rows(company_id, supplier_id):
+    rows = (
+        Payable.query.filter_by(company_id=company_id, supplier_id=supplier_id)
+        .order_by(Payable.document_date, Payable.document_number, Payable.id)
+        .all()
+    )
+    return [
+        {
+            "document": row.document_number,
+            "date": row.document_date,
+            "due_date": row.due_date,
+            "type": row.transaction_type or row.source_type,
+            "source": "Opening" if row.is_opening else row.source_type.title(),
+            "total": row.total_amount,
+            "paid": row.paid_amount,
+            "balance": row.balance_amount,
+            "status": row.payment_status,
+            "remarks": row.remarks or "",
+            "edit_url": payable_edit_url(row),
+        }
+        for row in rows
+    ]
+
+
 @bp.route("/payments", methods=["GET"])
 @login_required
 @require_permission("payments", "view")
@@ -174,4 +238,60 @@ def outstanding():
         advances=advances,
         summary=summary,
         companies=companies.order_by(Company.code).all(),
+    )
+
+
+@bp.route("/outstanding/customer/<int:company_id>/<int:customer_id>")
+@login_required
+@require_permission("outstanding", "view")
+def outstanding_customer_detail(company_id, customer_id):
+    require_active_company_document(company_id)
+    company = db.session.get(Company, company_id)
+    customer = db.session.get(Customer, customer_id)
+    if not company or not customer:
+        abort(404)
+    rows = receivable_detail_rows(company_id, customer_id)
+    summary = {
+        "total": money(sum((row["total"] for row in rows), 0)),
+        "paid": money(sum((row["paid"] for row in rows), 0)),
+        "balance": money(sum((row["balance"] for row in rows), 0)),
+        "count": len(rows),
+    }
+    return render_template(
+        "payments/outstanding_detail.html",
+        title="Customer Outstanding Details",
+        party_label="Customer",
+        party_name=customer.name,
+        company=company,
+        rows=rows,
+        summary=summary,
+        back_url=url_for("payments.outstanding"),
+    )
+
+
+@bp.route("/outstanding/supplier/<int:company_id>/<int:supplier_id>")
+@login_required
+@require_permission("outstanding", "view")
+def outstanding_supplier_detail(company_id, supplier_id):
+    require_active_company_document(company_id)
+    company = db.session.get(Company, company_id)
+    supplier = db.session.get(Supplier, supplier_id)
+    if not company or not supplier:
+        abort(404)
+    rows = payable_detail_rows(company_id, supplier_id)
+    summary = {
+        "total": money(sum((row["total"] for row in rows), 0)),
+        "paid": money(sum((row["paid"] for row in rows), 0)),
+        "balance": money(sum((row["balance"] for row in rows), 0)),
+        "count": len(rows),
+    }
+    return render_template(
+        "payments/outstanding_detail.html",
+        title="Supplier Outstanding Details",
+        party_label="Supplier",
+        party_name=supplier.name,
+        company=company,
+        rows=rows,
+        summary=summary,
+        back_url=url_for("payments.outstanding"),
     )

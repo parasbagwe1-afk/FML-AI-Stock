@@ -39,7 +39,9 @@ def grouped_party_outstanding(entries, party_kind):
         group = groups.setdefault(
             key,
             {
+                "company_id": entry.company_id,
                 "company": entry.company.code,
+                "party_id": party_id,
                 "party": party,
                 "documents": [],
                 "date": entry.document_date,

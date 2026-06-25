@@ -6,7 +6,7 @@
   'advance': 'Opening Advance'
 } %}
 {% block page_title %}Edit {{ title_map.get(section, 'Opening Balance') }}{% endblock %}
-{% block page_subtitle %}Update opening balance details before allocations or stock consumption lock the entry.{% endblock %}
+{% block page_subtitle %}Update opening balance details. After allocation, company and party stay locked and amount cannot go below paid/received value.{% endblock %}
 {% block content %}
   <section class="panel">
     <form method="post" class="form-grid wide">

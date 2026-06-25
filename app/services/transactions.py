@@ -1806,8 +1806,6 @@ def create_opening_receivable(data, user):
 def update_opening_receivable(receivable, data, user):
     if not receivable.is_opening or receivable.source_type != "OPENING_RECEIVABLE":
         raise ValueError("Only opening receivables can be edited from opening balances.")
-    if receivable.paid_amount:
-        raise ValueError("Opening receivable cannot be edited after receipt allocation.")
     company = db.session.get(Company, int(data.get("company_id") or receivable.company_id))
     if not company or not company.active:
         raise ValueError("Company is required.")
@@ -1819,6 +1817,14 @@ def update_opening_receivable(receivable, data, user):
     )
     customer = active_customer(data.get("customer_id") or receivable.customer_id)
     amount = positive_money(data.get("pending_amount"), "Pending amount")
+    paid_amount = money(receivable.paid_amount or Decimal("0.00"))
+    if paid_amount:
+        if company.id != receivable.company_id:
+            raise ValueError("Opening receivable company cannot be changed after receipt allocation.")
+        if customer.id != receivable.customer_id:
+            raise ValueError("Opening receivable customer cannot be changed after receipt allocation.")
+        if amount < paid_amount:
+            raise ValueError("Opening receivable amount cannot be less than already received amount.")
     before = {
         "company_id": receivable.company_id,
         "customer_id": receivable.customer_id,
@@ -1826,6 +1832,7 @@ def update_opening_receivable(receivable, data, user):
         "document_date": receivable.document_date,
         "due_date": receivable.due_date,
         "total_amount": receivable.total_amount,
+        "paid_amount": receivable.paid_amount,
     }
     receivable.company_id = company.id
     receivable.stock_book_id = stock_book.id
@@ -1835,11 +1842,20 @@ def update_opening_receivable(receivable, data, user):
     receivable.due_date = _optional_due_date(data.get("due_date"))
     receivable.transaction_type = data.get("sale_type") or receivable.transaction_type
     receivable.total_amount = amount
-    receivable.balance_amount = amount
-    receivable.payment_status = payment_status(amount, Decimal("0.00"))
+    receivable.balance_amount = money(amount - paid_amount)
+    receivable.payment_status = payment_status(amount, paid_amount)
     receivable.remarks = data.get("remarks") or None
     receivable.updated_by_id = getattr(user, "id", None)
-    audit("edit", "OpeningReceivable", receivable.id, receivable.document_number, before=before, user=user)
+    audit("edit", "OpeningReceivable", receivable.id, receivable.document_number, before=before, after={
+        "company_id": receivable.company_id,
+        "customer_id": receivable.customer_id,
+        "document_number": receivable.document_number,
+        "document_date": receivable.document_date,
+        "due_date": receivable.due_date,
+        "total_amount": receivable.total_amount,
+        "paid_amount": receivable.paid_amount,
+        "balance_amount": receivable.balance_amount,
+    }, user=user)
     return receivable
 
 
@@ -1885,8 +1901,6 @@ def create_opening_payable(data, user):
 def update_opening_payable(payable, data, user):
     if not payable.is_opening or payable.source_type != "OPENING_PAYABLE":
         raise ValueError("Only opening payables can be edited from opening balances.")
-    if payable.paid_amount:
-        raise ValueError("Opening payable cannot be edited after payment allocation.")
     company = db.session.get(Company, int(data.get("company_id") or payable.company_id))
     if not company or not company.active:
         raise ValueError("Company is required.")
@@ -1898,6 +1912,14 @@ def update_opening_payable(payable, data, user):
     )
     supplier = active_supplier(data.get("supplier_id") or payable.supplier_id)
     amount = positive_money(data.get("pending_amount"), "Pending amount")
+    paid_amount = money(payable.paid_amount or Decimal("0.00"))
+    if paid_amount:
+        if company.id != payable.company_id:
+            raise ValueError("Opening payable company cannot be changed after payment allocation.")
+        if supplier.id != payable.supplier_id:
+            raise ValueError("Opening payable supplier cannot be changed after payment allocation.")
+        if amount < paid_amount:
+            raise ValueError("Opening payable amount cannot be less than already paid amount.")
     before = {
         "company_id": payable.company_id,
         "supplier_id": payable.supplier_id,
@@ -1905,6 +1927,7 @@ def update_opening_payable(payable, data, user):
         "document_date": payable.document_date,
         "due_date": payable.due_date,
         "total_amount": payable.total_amount,
+        "paid_amount": payable.paid_amount,
     }
     payable.company_id = company.id
     payable.stock_book_id = stock_book.id
@@ -1914,11 +1937,20 @@ def update_opening_payable(payable, data, user):
     payable.due_date = _optional_due_date(data.get("due_date"))
     payable.transaction_type = data.get("purchase_type") or payable.transaction_type
     payable.total_amount = amount
-    payable.balance_amount = amount
-    payable.payment_status = payment_status(amount, Decimal("0.00"))
+    payable.balance_amount = money(amount - paid_amount)
+    payable.payment_status = payment_status(amount, paid_amount)
     payable.remarks = data.get("remarks") or None
     payable.updated_by_id = getattr(user, "id", None)
-    audit("edit", "OpeningPayable", payable.id, payable.document_number, before=before, user=user)
+    audit("edit", "OpeningPayable", payable.id, payable.document_number, before=before, after={
+        "company_id": payable.company_id,
+        "supplier_id": payable.supplier_id,
+        "document_number": payable.document_number,
+        "document_date": payable.document_date,
+        "due_date": payable.due_date,
+        "total_amount": payable.total_amount,
+        "paid_amount": payable.paid_amount,
+        "balance_amount": payable.balance_amount,
+    }, user=user)
     return payable
 
 

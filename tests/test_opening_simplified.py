@@ -1,5 +1,6 @@
 from datetime import date
 
+from app.extensions import db
 from app.models import (
     FIFOLayer,
     InterCompanyLedgerEntry,
@@ -10,7 +11,9 @@ from app.models import (
     Receivable,
     StockLedgerEntry,
 )
-from tests.test_fifo_workflows import ids
+from app.services.payments import create_customer_receipt, create_supplier_payment
+from app.services.transactions import create_opening_payable, create_opening_receivable
+from tests.test_fifo_workflows import admin, ids
 from tests.test_navigation import login
 
 
@@ -292,3 +295,141 @@ def test_opening_receivable_dates_are_optional_and_entry_can_be_edited(client, a
         receivable = Receivable.query.filter_by(document_number="OPEN-REC-EDITED").one()
         assert receivable.total_amount == 2500
         assert receivable.balance_amount == 2500
+
+
+def test_allocated_opening_receivable_can_be_safely_edited(client, app):
+    with app.app_context():
+        data = ids()
+        receivable = create_opening_receivable(
+            {
+                "company_id": data["ai"].id,
+                "customer_id": data["customer"].id,
+                "sale_type": "CASH",
+                "reference_number": "OPEN-REC-ALLOC",
+                "invoice_date": "2026-05-31",
+                "due_date": "2026-05-31",
+                "pending_amount": "86000",
+            },
+            admin(),
+        )
+        create_customer_receipt(
+            {
+                "company_id": data["ai"].id,
+                "customer_id": data["customer"].id,
+                "receivable_id": receivable.id,
+                "payment_date": "2026-06-25",
+                "amount": "50000",
+                "mode": "UPI",
+                "reference_number": "OPEN-REC-ALLOC-PAY",
+            },
+            admin(),
+        )
+        db.session.commit()
+        receivable_id = receivable.id
+        company_id = data["ai"].id
+        customer_id = data["customer"].id
+
+    login(client)
+    response = client.post(
+        f"/transactions/opening/receivable/{receivable_id}/edit",
+        data={
+            "company_id": company_id,
+            "customer_id": customer_id,
+            "sale_type": "CASH",
+            "reference_number": "OPEN-REC-ALLOC-EDITED",
+            "invoice_date": "2026-05-31",
+            "due_date": "2026-06-30",
+            "pending_amount": "90000",
+            "remarks": "Corrected after receipt",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Opening receivable updated." in response.data
+    with app.app_context():
+        receivable = db.session.get(Receivable, receivable_id)
+        assert receivable.document_number == "OPEN-REC-ALLOC-EDITED"
+        assert receivable.total_amount == 90000
+        assert receivable.paid_amount == 50000
+        assert receivable.balance_amount == 40000
+        assert receivable.payment_status == "PARTIAL"
+
+    response = client.post(
+        f"/transactions/opening/receivable/{receivable_id}/edit",
+        data={
+            "company_id": company_id,
+            "customer_id": customer_id,
+            "sale_type": "CASH",
+            "reference_number": "OPEN-REC-ALLOC-LOW",
+            "invoice_date": "2026-05-31",
+            "due_date": "2026-06-30",
+            "pending_amount": "49999",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Opening receivable amount cannot be less than already received amount." in response.data
+    with app.app_context():
+        receivable = db.session.get(Receivable, receivable_id)
+        assert receivable.document_number == "OPEN-REC-ALLOC-EDITED"
+        assert receivable.total_amount == 90000
+
+
+def test_allocated_opening_payable_can_be_safely_edited(client, app):
+    with app.app_context():
+        data = ids()
+        payable = create_opening_payable(
+            {
+                "company_id": data["ai"].id,
+                "supplier_id": data["supplier"].id,
+                "purchase_type": "GST",
+                "reference_number": "OPEN-PAY-ALLOC",
+                "bill_date": "2026-05-31",
+                "due_date": "2026-06-30",
+                "pending_amount": "25000",
+            },
+            admin(),
+        )
+        create_supplier_payment(
+            {
+                "company_id": data["ai"].id,
+                "supplier_id": data["supplier"].id,
+                "payable_id": payable.id,
+                "payment_date": "2026-06-25",
+                "amount": "10000",
+                "mode": "BANK",
+                "reference_number": "OPEN-PAY-ALLOC-PAY",
+            },
+            admin(),
+        )
+        db.session.commit()
+        payable_id = payable.id
+        company_id = data["ai"].id
+        supplier_id = data["supplier"].id
+
+    login(client)
+    response = client.post(
+        f"/transactions/opening/payable/{payable_id}/edit",
+        data={
+            "company_id": company_id,
+            "supplier_id": supplier_id,
+            "purchase_type": "GST",
+            "reference_number": "OPEN-PAY-ALLOC-EDITED",
+            "bill_date": "2026-05-31",
+            "due_date": "2026-06-30",
+            "pending_amount": "30000",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Opening payable updated." in response.data
+    with app.app_context():
+        payable = db.session.get(Payable, payable_id)
+        assert payable.document_number == "OPEN-PAY-ALLOC-EDITED"
+        assert payable.total_amount == 30000
+        assert payable.paid_amount == 10000
+        assert payable.balance_amount == 20000
+        assert payable.payment_status == "PARTIAL"

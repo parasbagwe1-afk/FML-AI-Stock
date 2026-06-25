@@ -32,6 +32,7 @@ from app.services.customer_ledger import (
     ledger_metrics,
     monthly_customer_summary,
 )
+from app.services.item_ledger import item_ledger as build_item_ledger
 from app.services.outstanding import grouped_party_outstanding
 from app.services.stock import available_quantity, available_value
 from app.services.transactions import pending_transfer_summary
@@ -44,6 +45,7 @@ REPORT_TITLES = {
     "fifo-valuation": "FIFO Valuation Report",
     "fifo-layers": "FIFO Layer Detail",
     "stock-ledger": "Stock Ledger",
+    "item-ledger": "Item Movement Ledger",
     "purchases": "Purchase Report",
     "sales": "Sales Report",
     "sales-by-type": "Sales by Company and Type",
@@ -132,6 +134,16 @@ def int_arg(name):
         return None
 
 
+def date_arg(name):
+    value = request.args.get(name)
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
 def selected_report_company_id():
     company = active_company()
     if company:
@@ -183,6 +195,106 @@ def customer_ledger_detail_rows(detail):
         )
     rows.append(["", "Closing Balance", "", "", "", "", fmt_money(detail["closing"])])
     return rows
+
+
+def item_ledger_filters():
+    company = active_company()
+    companies = Company.query.filter_by(active=True)
+    if company:
+        companies = companies.filter(Company.id == company.id)
+    selected_company_id = selected_report_company_id()
+    selected_stock_book_id = int_arg("stock_book_id")
+    selected_item_id = int_arg("item_id")
+    if not selected_item_id:
+        first_item = Item.query.filter_by(active=True).order_by(Item.code).first()
+        selected_item_id = first_item.id if first_item else None
+    stock_books = StockBook.query.filter_by(active=True)
+    if selected_company_id:
+        stock_books = stock_books.filter(StockBook.company_id == selected_company_id)
+    return {
+        "companies": companies.order_by(Company.code).all(),
+        "stock_books": stock_books.order_by(StockBook.code).all(),
+        "items": Item.query.filter_by(active=True).order_by(Item.code).all(),
+        "selected_company_id": selected_company_id,
+        "selected_stock_book_id": selected_stock_book_id,
+        "selected_item_id": selected_item_id,
+        "date_from": date_arg("date_from"),
+        "date_to": date_arg("date_to"),
+        "highlight_id": int_arg("highlight_id"),
+    }
+
+
+ITEM_LEDGER_HEADERS = [
+    "Date",
+    "Particulars",
+    "Party type",
+    "Voucher type",
+    "Voucher no",
+    "Inwards qty",
+    "Inwards value",
+    "Outwards qty",
+    "Outwards value",
+    "Voucher amount",
+    "Closing qty",
+    "Closing value",
+]
+
+
+def item_ledger_rows(rows):
+    return [
+        [
+            row["date"],
+            row["particulars"],
+            row["party_kind"],
+            row["voucher_type"],
+            row["voucher_no"],
+            fmt_qty(row["inward_qty"]),
+            fmt_money(row["inward_value"]),
+            fmt_qty(row["outward_qty"]),
+            fmt_money(row["outward_value"]),
+            fmt_money(row["voucher_amount"]),
+            fmt_qty(row["closing_qty"]),
+            fmt_money(row["closing_value"]),
+        ]
+        for row in rows
+    ]
+
+
+def export_urls_for(endpoint):
+    urls = {}
+    for fmt in ("csv", "xlsx", "pdf"):
+        args = request.args.to_dict()
+        args["format"] = fmt
+        urls[fmt] = url_for(endpoint, **args)
+    return urls
+
+
+@bp.route("/item-ledger")
+@login_required
+@require_permission("reports", "view")
+def item_ledger():
+    filters = item_ledger_filters()
+    ledger = build_item_ledger(
+        filters["selected_item_id"],
+        filters["selected_company_id"],
+        filters["selected_stock_book_id"],
+        filters["date_from"],
+        filters["date_to"],
+        filters["highlight_id"],
+    )
+    export_format = request.args.get("format")
+    selected_item = db.session.get(Item, filters["selected_item_id"]) if filters["selected_item_id"] else None
+    if export_format:
+        require_permission("reports", "export")(lambda: None)()
+        title = f"Item Movement Ledger - {selected_item.display_name if selected_item else 'All Items'}"
+        return export_table(title, ITEM_LEDGER_HEADERS, item_ledger_rows(ledger["rows"]), export_format)
+    return render_template(
+        "reports/item_ledger.html",
+        ledger=ledger,
+        selected_item=selected_item,
+        export_urls=export_urls_for("reports.item_ledger"),
+        **filters,
+    )
 
 
 @bp.route("/customer-ledger")
@@ -464,6 +576,7 @@ def created_by_summary(user_ids):
 def format_grouped_outstanding_rows(entries, party_kind):
     rows = []
     for group in grouped_party_outstanding(entries, party_kind):
+        advance_credit = money(group.get("advance_offset", Decimal("0.00")) + group.get("open_advance", Decimal("0.00")))
         rows.append([
             group["company"],
             group["party"],
@@ -472,6 +585,7 @@ def format_grouped_outstanding_rows(entries, party_kind):
             group["due_date"] or "",
             fmt_money(group["total"]),
             fmt_money(group["paid"]),
+            fmt_money(advance_credit),
             fmt_money(group["balance"]),
             group["status"],
             created_by_summary(group["created_by_ids"]),
@@ -480,14 +594,14 @@ def format_grouped_outstanding_rows(entries, party_kind):
 
 
 def customer_outstanding_rows():
-    headers = ["Company", "Customer", "Documents", "First date", "Next due", "Total", "Paid", "Balance", "Status", "Created by"]
+    headers = ["Company", "Customer", "Documents", "First date", "Next due", "Debit bills", "Credit received", "Advance credit", "Closing balance", "Status", "Created by"]
     query = scope_query_to_active_company(Receivable.query, Receivable.company_id)
     entries = query.order_by(Receivable.due_date, Receivable.document_number).all()
     return headers, format_grouped_outstanding_rows(entries, "customer")
 
 
 def supplier_outstanding_rows():
-    headers = ["Company", "Supplier", "Documents", "First date", "Next due", "Total", "Paid", "Balance", "Status", "Created by"]
+    headers = ["Company", "Supplier", "Documents", "First date", "Next due", "Debit bills", "Credit paid", "Advance", "Closing balance", "Status", "Created by"]
     query = scope_query_to_active_company(Payable.query, Payable.company_id)
     entries = query.order_by(Payable.due_date, Payable.document_number).all()
     return headers, format_grouped_outstanding_rows(entries, "supplier")

@@ -577,6 +577,13 @@ th {
 tbody tr:nth-child(even) { background: #FCFCFD; }
 tbody tr { transition: background 140ms ease; }
 tbody tr:hover { background: #EEF9F6; }
+tbody tr.current-entry {
+  background: #FFF3C4;
+  box-shadow: inset 4px 0 0 var(--amber);
+}
+tbody tr.current-entry:hover {
+  background: #FFEAA0;
+}
 .empty { color: var(--muted); text-align: center; }
 .actions {
   display: flex;
@@ -991,6 +998,11 @@ button.is-loading::after {
 }
 .report-card span, .muted-copy { color: var(--muted); }
 .permission-box { border: 1px solid var(--border); padding: 12px; border-radius: 8px; }
+
+.ledger-overview {
+  align-items: start;
+  margin-bottom: 18px;
+}
 
 @keyframes page-in {
   from { opacity: 0; transform: translateY(6px); }

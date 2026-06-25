@@ -27,12 +27,12 @@
 
   <div id="outstanding_tables">
   <section class="metric-grid outstanding-summary" data-outstanding-summary data-live-summary-target="#outstanding_tables">
-    <article class="metric-card" data-summary-table="receivables" data-summary-column="7">
+    <article class="metric-card" data-summary-table="receivables" data-summary-column="8">
       <span>Customer Balance</span>
       <strong>{{ fmt_money(summary.receivable_balance) }}</strong>
       <small>{{ summary.receivable_count }} customer{{ '' if summary.receivable_count == 1 else 's' }}</small>
     </article>
-    <article class="metric-card amber" data-summary-table="payables" data-summary-column="7">
+    <article class="metric-card amber" data-summary-table="payables" data-summary-column="8">
       <span>Supplier Balance</span>
       <strong>{{ fmt_money(summary.payable_balance) }}</strong>
       <small>{{ summary.payable_count }} supplier{{ '' if summary.payable_count == 1 else 's' }}</small>
@@ -46,16 +46,16 @@
   <section class="panel">
     <div class="panel-title"><h2>Customer Outstanding</h2><a href="{{ url_for('reports.show', name='customer-outstanding') }}">Export report</a></div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Company</th><th>Customer</th><th>Documents</th><th>First date</th><th>Next due</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th>Actions</th></tr></thead>
-      <tbody>{% for row in receivables %}<tr><td>{{ row.company }}</td><td>{% if row.party_id %}<a class="table-action" href="{{ url_for('payments.outstanding_customer_detail', company_id=row.company_id, customer_id=row.party_id) }}">{{ row.party }}</a>{% else %}{{ row.party }}{% endif %}</td><td>{{ row.documents_label }}</td><td>{{ row.date }}</td><td>{{ row.due_date or '' }}</td><td>{{ fmt_money(row.total) }}</td><td>{{ fmt_money(row.paid) }}</td><td>{{ fmt_money(row.balance) }}</td><td>{{ row.status }}</td><td>{% if row.party_id %}<a class="table-action" href="{{ url_for('payments.outstanding_customer_detail', company_id=row.company_id, customer_id=row.party_id) }}">Details</a>{% endif %}</td></tr>{% else %}<tr><td colspan="10" class="empty">No receivables.</td></tr>{% endfor %}</tbody>
+      <thead><tr><th>Company</th><th>Customer</th><th>Documents</th><th>First date</th><th>Next due</th><th>Debit bills</th><th>Credit received</th><th>Advance credit</th><th>Closing balance</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>{% for row in receivables %}{% set advance_credit = row.advance_offset + row.open_advance %}<tr><td>{{ row.company }}</td><td>{% if row.party_id %}<a class="table-action" href="{{ url_for('payments.outstanding_customer_detail', company_id=row.company_id, customer_id=row.party_id) }}">{{ row.party }}</a>{% else %}{{ row.party }}{% endif %}</td><td>{{ row.documents_label }}</td><td>{{ row.date }}</td><td>{{ row.due_date or '' }}</td><td>{{ fmt_money(row.total) }}</td><td>{{ fmt_money(row.paid) }}</td><td>{{ fmt_money(advance_credit) }}</td><td>{{ fmt_money(row.balance) }}</td><td>{{ row.status }}</td><td>{% if row.party_id %}<a class="table-action" href="{{ url_for('payments.outstanding_customer_detail', company_id=row.company_id, customer_id=row.party_id) }}">Details</a>{% endif %}</td></tr>{% else %}<tr><td colspan="11" class="empty">No receivables.</td></tr>{% endfor %}</tbody>
     </table></div>
   </section>
 
   <section class="panel">
     <div class="panel-title"><h2>Supplier Outstanding</h2><a href="{{ url_for('reports.show', name='supplier-outstanding') }}">Export report</a></div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Company</th><th>Supplier</th><th>Documents</th><th>First date</th><th>Next due</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th>Actions</th></tr></thead>
-      <tbody>{% for row in payables %}<tr><td>{{ row.company }}</td><td>{% if row.party_id %}<a class="table-action" href="{{ url_for('payments.outstanding_supplier_detail', company_id=row.company_id, supplier_id=row.party_id) }}">{{ row.party }}</a>{% else %}{{ row.party }}{% endif %}</td><td>{{ row.documents_label }}</td><td>{{ row.date }}</td><td>{{ row.due_date or '' }}</td><td>{{ fmt_money(row.total) }}</td><td>{{ fmt_money(row.paid) }}</td><td>{{ fmt_money(row.balance) }}</td><td>{{ row.status }}</td><td>{% if row.party_id %}<a class="table-action" href="{{ url_for('payments.outstanding_supplier_detail', company_id=row.company_id, supplier_id=row.party_id) }}">Details</a>{% endif %}</td></tr>{% else %}<tr><td colspan="10" class="empty">No payables.</td></tr>{% endfor %}</tbody>
+      <thead><tr><th>Company</th><th>Supplier</th><th>Documents</th><th>First date</th><th>Next due</th><th>Debit bills</th><th>Credit paid</th><th>Advance</th><th>Closing balance</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>{% for row in payables %}{% set advance_credit = row.advance_offset + row.open_advance %}<tr><td>{{ row.company }}</td><td>{% if row.party_id %}<a class="table-action" href="{{ url_for('payments.outstanding_supplier_detail', company_id=row.company_id, supplier_id=row.party_id) }}">{{ row.party }}</a>{% else %}{{ row.party }}{% endif %}</td><td>{{ row.documents_label }}</td><td>{{ row.date }}</td><td>{{ row.due_date or '' }}</td><td>{{ fmt_money(row.total) }}</td><td>{{ fmt_money(row.paid) }}</td><td>{{ fmt_money(advance_credit) }}</td><td>{{ fmt_money(row.balance) }}</td><td>{{ row.status }}</td><td>{% if row.party_id %}<a class="table-action" href="{{ url_for('payments.outstanding_supplier_detail', company_id=row.company_id, supplier_id=row.party_id) }}">Details</a>{% endif %}</td></tr>{% else %}<tr><td colspan="11" class="empty">No payables.</td></tr>{% endfor %}</tbody>
     </table></div>
   </section>
 

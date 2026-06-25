@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
@@ -7,6 +9,8 @@ from app.core.security import can, require_permission
 from app.extensions import db
 from app.models import Company, Customer, Payable, Payment, PaymentMode, Receivable, Supplier
 from app.services.entry_exports import export_entry, payment_rows
+from app.services.customer_ledger import customer_ledger_entries
+from app.services.customer_profile import customer_profile
 from app.services.outstanding import grouped_party_outstanding, outstanding_summary_from_rows
 from app.services.payments import create_customer_receipt, create_supplier_payment, delete_payment, update_payment
 
@@ -111,6 +115,15 @@ def payable_detail_rows(company_id, supplier_id):
         }
         for row in rows
     ]
+
+
+def customer_activity_rows(company_id, customer_id):
+    balance = Decimal("0.00")
+    rows = []
+    for entry in customer_ledger_entries(company_id, customer_id):
+        balance = money(balance + entry["debit"] - entry["credit"])
+        rows.append({**entry, "balance": balance})
+    return rows
 
 
 @bp.route("/payments", methods=["GET"])
@@ -332,6 +345,7 @@ def outstanding_customer_detail(company_id, customer_id):
         abort(404)
     rows = receivable_detail_rows(company_id, customer_id)
     summary = outstanding_summary_from_rows(rows, company_id, "customer", customer_id)
+    profile = customer_profile(customer_id, company_id)
     return render_template(
         "payments/outstanding_detail.html",
         title="Customer Outstanding Details",
@@ -340,6 +354,8 @@ def outstanding_customer_detail(company_id, customer_id):
         company=company,
         rows=rows,
         summary=summary,
+        profile=profile,
+        activity_rows=customer_activity_rows(company_id, customer_id),
         back_url=url_for("payments.outstanding"),
     )
 

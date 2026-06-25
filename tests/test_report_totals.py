@@ -1,5 +1,5 @@
 from app.extensions import db
-from app.models import Payment, Receivable
+from app.models import Payment, Receivable, StockLedgerEntry
 from app.services.payments import create_customer_receipt
 from app.services.transactions import create_opening_receivable, create_purchase, create_sale
 from tests.test_fifo_workflows import admin, ids
@@ -135,6 +135,19 @@ def test_outstanding_customer_detail_shows_bill_dates_and_edit_links(client, app
             [{"item_id": data["item"].id, "quantity": "1", "rate": "100", "gst_percent": "18"}],
             admin(),
         )
+        receivable = Receivable.query.filter_by(source_type="SALE", source_id=sale.id).one()
+        create_customer_receipt(
+            {
+                "company_id": data["ai"].id,
+                "customer_id": data["customer"].id,
+                "receivable_id": receivable.id,
+                "payment_date": "2026-06-24",
+                "amount": "50",
+                "mode": "UPI",
+                "reference_number": "DETAIL-CUST-RCPT",
+            },
+            admin(),
+        )
         company_id = data["ai"].id
         customer_id = data["customer"].id
         sale_id = sale.id
@@ -149,6 +162,59 @@ def test_outstanding_customer_detail_shows_bill_dates_and_edit_links(client, app
     assert "2026-06-23" in html
     assert "2026-06-30" in html
     assert f"/transactions/sale/{sale_id}/edit" in html
+    assert "Customer Activity" in html
+    assert "Sales Done" in html
+    assert "DETAIL-CUST-RCPT" in html
+
+
+def test_item_ledger_shows_supplier_debtor_and_running_stock(client, app):
+    with app.app_context():
+        data = ids()
+        create_purchase(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "supplier_id": data["supplier"].id,
+                "purchase_type": "GST",
+                "bill_number": "ITEM-LEDGER-PUR",
+                "bill_date": "2026-06-01",
+            },
+            [{"item_id": data["item"].id, "quantity": "5", "rate": "100", "gst_percent": "0"}],
+            admin(),
+        )
+        sale = create_sale(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "customer_id": data["customer"].id,
+                "sale_type": "GST",
+                "invoice_number": "ITEM-LEDGER-SALE",
+                "invoice_date": "2026-06-02",
+            },
+            [{"item_id": data["item"].id, "quantity": "2", "rate": "150", "gst_percent": "0"}],
+            admin(),
+        )
+        sale_entry = StockLedgerEntry.query.filter_by(transaction_type="SALE", transaction_id=sale.id).first()
+        company_id = data["ai"].id
+        item_id = data["item"].id
+        highlight_id = sale_entry.id
+        supplier_name = data["supplier"].name
+        customer_name = data["customer"].name
+        db.session.commit()
+
+    login(client)
+    response = client.get(f"/reports/item-ledger?company_id={company_id}&item_id={item_id}&highlight_id={highlight_id}")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "Item Movement Ledger" in html
+    assert "ITEM-LEDGER-PUR" in html
+    assert "ITEM-LEDGER-SALE" in html
+    assert supplier_name in html
+    assert customer_name in html
+    assert "current-entry" in html
+    assert ">3<" in html
+    assert "₹300.00" in html
 
 
 def test_customer_receipt_overage_allocates_next_open_bill(app):

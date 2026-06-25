@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block page_title %}Item Movement Ledger{% endblock %}
+{% block page_subtitle %}Inward supplier movement, outward debtor movement, and running stock balance by item.{% endblock %}
+{% block content %}
+  <section class="panel">
+    <form class="toolbar" method="get">
+      <a class="secondary-button" href="{{ url_for('reports.index') }}">All reports</a>
+      <select name="item_id" required>
+        {% for item in items %}
+          <option value="{{ item.id }}" {% if selected_item_id == item.id %}selected{% endif %}>{{ item.display_name }}</option>
+        {% endfor %}
+      </select>
+      <select name="company_id" {% if active_company %}disabled{% endif %}>
+        {% if not active_company %}<option value="">All companies</option>{% endif %}
+        {% for company in companies %}
+          <option value="{{ company.id }}" {% if selected_company_id == company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>
+        {% endfor %}
+      </select>
+      {% if active_company %}<input type="hidden" name="company_id" value="{{ active_company.id }}">{% endif %}
+      <select name="stock_book_id">
+        <option value="">All stock books</option>
+        {% for stock_book in stock_books %}
+          <option value="{{ stock_book.id }}" {% if selected_stock_book_id == stock_book.id %}selected{% endif %}>{{ stock_book.code }} - {{ stock_book.name }}</option>
+        {% endfor %}
+      </select>
+      <input type="date" name="date_from" value="{{ date_from or '' }}" aria-label="From date">
+      <input type="date" name="date_to" value="{{ date_to or '' }}" aria-label="To date">
+      <button class="secondary-button" type="submit">Find</button>
+      <span class="spacer"></span>
+      <a class="secondary-button" href="{{ export_urls.csv }}">CSV</a>
+      <a class="secondary-button" href="{{ export_urls.xlsx }}">XLSX</a>
+      <a class="secondary-button" href="{{ export_urls.pdf }}">PDF</a>
+    </form>
+  </section>
+
+  <section class="metric-grid">
+    <article class="metric-card">
+      <span>Inwards</span>
+      <strong>{{ fmt_qty(ledger.summary.inward_qty) }}</strong>
+      <small>{{ fmt_money(ledger.summary.inward_value) }} stock value</small>
+    </article>
+    <article class="metric-card amber">
+      <span>Outwards</span>
+      <strong>{{ fmt_qty(ledger.summary.outward_qty) }}</strong>
+      <small>{{ fmt_money(ledger.summary.outward_value) }} stock value</small>
+    </article>
+    <article class="metric-card">
+      <span>Closing Balance</span>
+      <strong>{{ fmt_qty(ledger.summary.closing_qty) }}</strong>
+      <small>{{ fmt_money(ledger.summary.closing_value) }} closing value</small>
+    </article>
+    <article class="metric-card">
+      <span>Parties</span>
+      <strong>{{ ledger.summary.suppliers }} / {{ ledger.summary.customers }}</strong>
+      <small>Suppliers / debtors for this item</small>
+    </article>
+  </section>
+
+  <section class="grid two ledger-overview">
+    <article class="panel">
+      <div class="panel-title">
+        <h2>Supplier Sources</h2>
+        <span class="muted-copy">Inward quantity for {{ selected_item.display_name if selected_item else 'item' }}</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Supplier</th><th>Qty</th><th>Stock value</th><th>Bill value</th></tr></thead>
+          <tbody>
+            {% for row in ledger.supplier_rows %}
+              <tr><td>{{ row.party }}</td><td>{{ fmt_qty(row.quantity) }}</td><td>{{ fmt_money(row.value) }}</td><td>{{ fmt_money(row.voucher_amount) }}</td></tr>
+            {% else %}
+              <tr><td colspan="4" class="empty">No supplier movement for this item.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
+    <article class="panel">
+      <div class="panel-title">
+        <h2>Debtor Movement</h2>
+        <span class="muted-copy">Outward quantity sold/issued to customers</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Customer</th><th>Qty</th><th>Stock value</th><th>Invoice value</th></tr></thead>
+          <tbody>
+            {% for row in ledger.customer_rows %}
+              <tr><td>{{ row.party }}</td><td>{{ fmt_qty(row.quantity) }}</td><td>{{ fmt_money(row.value) }}</td><td>{{ fmt_money(row.voucher_amount) }}</td></tr>
+            {% else %}
+              <tr><td colspan="4" class="empty">No debtor movement for this item.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+
+  <section class="panel">
+    <div class="panel-title">
+      <h2>Movement Details</h2>
+      <span class="muted-copy">Highlighted row is the selected/latest movement</span>
+    </div>
+    <div class="table-wrap tall">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Particulars</th><th>Party type</th><th>Vch type</th><th>Vch no.</th>
+            <th>In qty</th><th>In value</th><th>Out qty</th><th>Out value</th><th>Voucher amount</th>
+            <th>Closing qty</th><th>Closing value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in ledger.rows %}
+            <tr class="{% if row.is_current %}current-entry{% endif %}">
+              <td>{{ row.date }}</td>
+              <td>{{ row.particulars }}</td>
+              <td>{{ row.party_kind }}</td>
+              <td>{{ row.voucher_type }}</td>
+              <td>{{ row.voucher_no }}</td>
+              <td>{{ fmt_qty(row.inward_qty) if row.inward_qty else '' }}</td>
+              <td>{{ fmt_money(row.inward_value) if row.inward_value else '' }}</td>
+              <td>{{ fmt_qty(row.outward_qty) if row.outward_qty else '' }}</td>
+              <td>{{ fmt_money(row.outward_value) if row.outward_value else '' }}</td>
+              <td>{{ fmt_money(row.voucher_amount) }}</td>
+              <td>{{ fmt_qty(row.closing_qty) }}</td>
+              <td>{{ fmt_money(row.closing_value) }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="12" class="empty">No item movement found for the selected filters.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

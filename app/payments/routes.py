@@ -379,5 +379,6 @@ def outstanding_supplier_detail(company_id, supplier_id):
         company=company,
         rows=rows,
         summary=summary,
+        supplier=supplier,
         back_url=url_for("payments.outstanding"),
     )

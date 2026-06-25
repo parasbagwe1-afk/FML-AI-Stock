@@ -101,6 +101,9 @@ def test_transaction_rows_include_pdf_xl_links_and_exports_download(client, app)
             "receivable": receivable.id,
             "payable": payable.id,
             "advance": advance.id,
+            "customer": data["customer"].id,
+            "supplier": data["supplier"].id,
+            "company": data["ai"].id,
         }
 
     login(client)
@@ -118,6 +121,9 @@ def test_transaction_rows_include_pdf_xl_links_and_exports_download(client, app)
     assert f"/transactions/opening/receivable/{record_ids['receivable']}/export/xlsx" in opening_page
     assert f"/transactions/opening/payable/{record_ids['payable']}/export/pdf" in opening_page
     assert f"/transactions/opening/advance/{record_ids['advance']}/export/xlsx" in opening_page
+    assert "/reports/stock-ledger?q=EXPORT-OPENING" in opening_page
+    assert f"/masters/customers/{record_ids['customer']}?company_id={record_ids['company']}" in opening_page
+    assert f"/masters/suppliers/{record_ids['supplier']}/transactions?company_id={record_ids['company']}" in opening_page
     assert f"/finance/payments/{record_ids['advance']}/export/pdf" in payments_page
 
     downloads = [

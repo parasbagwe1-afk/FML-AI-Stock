@@ -9,6 +9,7 @@ from app.extensions import db
 from app.models import Company, Customer, Item, StockBook, Supplier
 from app.services.audit import audit
 from app.services.customer_profile import customer_master_rows, customer_profile, paginate_rows
+from app.services.supplier_profile import supplier_transactions
 
 bp = Blueprint("masters", __name__, url_prefix="/masters")
 
@@ -146,6 +147,24 @@ def customer_detail(customer_id):
     companies = Company.query.filter_by(active=True).order_by(Company.code).all()
     return render_template(
         "masters/customer_detail.html",
+        profile=profile,
+        companies=companies,
+        selected_company_id=selected_company_id,
+    )
+
+
+@bp.route("/suppliers/<int:supplier_id>/transactions")
+@login_required
+def supplier_transaction_detail(supplier_id):
+    config = config_or_404("suppliers")
+    require_permission(config["module"], "view")(lambda: None)()
+    selected_company_id = selected_customer_company_id()
+    profile = supplier_transactions(supplier_id, selected_company_id)
+    if not profile:
+        abort(404)
+    companies = Company.query.filter_by(active=True).order_by(Company.code).all()
+    return render_template(
+        "masters/supplier_transactions.html",
         profile=profile,
         companies=companies,
         selected_company_id=selected_company_id,

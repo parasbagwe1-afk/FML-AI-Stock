@@ -29,7 +29,7 @@
           {% if row.kind == 'customer' %}
             <option value="{{ row.identity }}" data-url="{{ url_for('masters.customer_detail', customer_id=row.customer.id, company_id=selected_company_id or '') }}"></option>
           {% else %}
-            <option value="{{ row.identity }}" data-url="{{ url_for('masters.list_records', kind='suppliers', q=row.supplier.name) }}"></option>
+            <option value="{{ row.identity }}" data-url="{{ url_for('masters.supplier_transaction_detail', supplier_id=row.supplier.id, company_id=selected_company_id or '') }}"></option>
           {% endif %}
         {% endfor %}
       </datalist>
@@ -63,6 +63,7 @@
                 <td>{{ customer.city or '' }}</td>
                 <td><span class="status {{ 'ok' if customer.active else 'muted' }}">{{ 'Active' if customer.active else 'Inactive' }}</span></td>
                 <td class="actions">
+                  <a class="table-action" href="{{ url_for('masters.customer_detail', customer_id=customer.id, company_id=selected_company_id or '') }}">Transactions</a>
                   <a class="table-action" href="{{ url_for('masters.customer_detail', customer_id=customer.id, company_id=selected_company_id or '') }}">View Details</a>
                   {% if can(current_user, config.module, 'edit') %}
                     <a class="table-action" href="{{ url_for('masters.edit_record', kind=kind, record_id=customer.id) }}">Edit</a>
@@ -80,6 +81,7 @@
                 <td></td>
                 <td><span class="status {{ 'ok' if supplier.active else 'muted' }}">{{ 'Supplier' if supplier.active else 'Inactive supplier' }}</span></td>
                 <td class="actions">
+                  <a class="table-action" href="{{ url_for('masters.supplier_transaction_detail', supplier_id=supplier.id, company_id=selected_company_id or '') }}">Transactions</a>
                   <a class="table-action" href="{{ url_for('masters.list_records', kind='suppliers', q=supplier.name) }}">Open Supplier</a>
                   {% if can(current_user, 'suppliers', 'edit') %}
                     <a class="table-action" href="{{ url_for('masters.edit_record', kind='suppliers', record_id=supplier.id) }}">Edit</a>

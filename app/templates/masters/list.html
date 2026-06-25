@@ -44,8 +44,11 @@
                 </td>
               {% endfor %}
               <td class="actions">
+                {% if kind == 'suppliers' %}
+                  <a class="table-action" href="{{ url_for('masters.supplier_transaction_detail', supplier_id=record.id) }}">Transactions</a>
+                {% endif %}
                 {% if can(current_user, config.module, 'edit') %}
-                  <a href="{{ url_for('masters.edit_record', kind=kind, record_id=record.id) }}">Edit</a>
+                  <a class="table-action" href="{{ url_for('masters.edit_record', kind=kind, record_id=record.id) }}">Edit</a>
                 {% endif %}
                 {% if can(current_user, config.module, 'deactivate') and record.active %}
                   <form method="post" action="{{ url_for('masters.deactivate_record', kind=kind, record_id=record.id) }}" data-confirm="Deactivate this record?">

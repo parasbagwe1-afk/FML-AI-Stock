@@ -105,7 +105,17 @@ def test_customer_list_includes_purchase_linked_suppliers(client, app):
     assert response.status_code == 200
     assert supplier_name in html
     assert "Supplier from purchase" in html
+    assert f"/masters/suppliers/{supplier_id}/transactions" in html
     assert f"/masters/suppliers/{supplier_id}/edit" in html
+
+    detail = client.get(f"/masters/suppliers/{supplier_id}/transactions")
+    detail_html = detail.get_data(as_text=True)
+
+    assert detail.status_code == 200
+    assert supplier_name in detail_html
+    assert "PROFILE-SUP-PUR" in detail_html
+    assert "Activity Till Date" in detail_html
+    assert "Purchase Bills" in detail_html
 
 
 def test_customer_json_apis_use_customer_id(client, app):

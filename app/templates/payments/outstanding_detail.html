@@ -8,6 +8,9 @@
       {% if profile %}
         <a class="secondary-button" href="{{ url_for('masters.customer_detail', customer_id=profile.customer.id, company_id=company.id) }}">Customer Profile</a>
       {% endif %}
+      {% if supplier %}
+        <a class="secondary-button" href="{{ url_for('masters.supplier_transaction_detail', supplier_id=supplier.id, company_id=company.id) }}">Supplier Transactions</a>
+      {% endif %}
     </form>
   </section>
 

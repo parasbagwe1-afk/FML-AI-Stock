@@ -3,12 +3,12 @@ from flask_login import current_user, login_required
 
 from app.core.company_context import active_company
 from app.core.formatting import money
-from app.core.security import require_permission
+from app.core.security import can, require_permission
 from app.extensions import db
 from app.models import Company, Customer, Payable, Payment, PaymentMode, Receivable, Supplier
 from app.services.entry_exports import export_entry, payment_rows
 from app.services.outstanding import grouped_party_outstanding
-from app.services.payments import create_customer_receipt, create_supplier_payment
+from app.services.payments import create_customer_receipt, create_supplier_payment, delete_payment, update_payment
 
 bp = Blueprint("payments", __name__, url_prefix="/finance")
 
@@ -41,6 +41,11 @@ def require_active_company_value(company_id):
 def require_active_company_document(company_id):
     company = active_company()
     if company and str(company_id or "") != str(company.id):
+        abort(403)
+
+
+def require_payment_edit_permission():
+    if not (can(current_user, "payments", "edit") or can(current_user, "payments", "deactivate")):
         abort(403)
 
 
@@ -133,6 +138,81 @@ def payment_export(payment_id, fmt):
         return export_entry(title, rows, fmt)
     except ValueError:
         abort(404)
+
+
+def allocated_target_ids(payment, target_type):
+    return {
+        allocation.target_id
+        for allocation in payment.allocations
+        if allocation.target_type == target_type
+    }
+
+
+def editable_receivables(payment):
+    target_ids = allocated_target_ids(payment, "RECEIVABLE")
+    query = Receivable.query.filter(Receivable.company_id == payment.company_id)
+    query = query.filter(db.or_(Receivable.balance_amount > 0, Receivable.id.in_(target_ids or {0})))
+    return query.order_by(Receivable.due_date, Receivable.document_number).all()
+
+
+def editable_payables(payment):
+    target_ids = allocated_target_ids(payment, "PAYABLE")
+    query = Payable.query.filter(Payable.company_id == payment.company_id)
+    query = query.filter(db.or_(Payable.balance_amount > 0, Payable.id.in_(target_ids or {0})))
+    return query.order_by(Payable.due_date, Payable.document_number).all()
+
+
+@bp.route("/payments/<int:payment_id>/edit", methods=["GET", "POST"])
+@login_required
+def payment_edit(payment_id):
+    require_payment_edit_permission()
+    payment = db.session.get(Payment, payment_id)
+    if not payment:
+        flash("Payment not found.", "danger")
+        return redirect(url_for("payments.index"))
+    require_active_company_document(payment.company_id)
+    if payment.payment_type.startswith("OPENING_ADVANCE"):
+        return redirect(url_for("transactions.opening_advance_edit", payment_id=payment.id))
+    if request.method == "POST":
+        try:
+            require_active_company_value(request.form.get("company_id") or payment.company_id)
+            update_payment(payment, request.form, current_user)
+            db.session.commit()
+            flash("Payment updated and allocation recalculated.", "success")
+            return redirect(url_for("payments.index"))
+        except Exception as exc:
+            db.session.rollback()
+            flash(str(exc), "danger")
+    return render_template(
+        "payments/edit.html",
+        payment=payment,
+        allocated_receivable_ids=allocated_target_ids(payment, "RECEIVABLE"),
+        allocated_payable_ids=allocated_target_ids(payment, "PAYABLE"),
+        edit_receivables=editable_receivables(payment),
+        edit_payables=editable_payables(payment),
+        **finance_options(),
+    )
+
+
+@bp.route("/payments/<int:payment_id>/delete", methods=["POST"])
+@login_required
+def payment_delete(payment_id):
+    require_payment_edit_permission()
+    payment = db.session.get(Payment, payment_id)
+    if not payment:
+        flash("Payment not found.", "danger")
+        return redirect(url_for("payments.index"))
+    require_active_company_document(payment.company_id)
+    if payment.payment_type.startswith("OPENING_ADVANCE"):
+        return redirect(url_for("transactions.opening_advance_delete", payment_id=payment.id), code=307)
+    try:
+        delete_payment(payment, current_user)
+        db.session.commit()
+        flash("Payment deleted and allocation reversed.", "success")
+    except Exception as exc:
+        db.session.rollback()
+        flash(str(exc), "danger")
+    return redirect(url_for("payments.index"))
 
 
 @bp.route("/payments/customer-receipt", methods=["POST"])

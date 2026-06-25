@@ -2,9 +2,12 @@ from decimal import Decimal
 
 from app.core.formatting import money, payment_status, positive_money
 from app.extensions import db
-from app.models import Payable, Payment, PaymentAllocation, Purchase, Receivable, Sale
+from app.models import Company, Payable, Payment, PaymentAllocation, Purchase, Receivable, Sale
 from app.services.audit import audit
 from app.services.validators import active_customer, active_supplier, parse_date
+
+
+EDITABLE_PAYMENT_TYPES = {"CUSTOMER_RECEIPT", "SUPPLIER_PAYMENT"}
 
 
 def sync_receivable(receivable):
@@ -75,6 +78,109 @@ def allocate_to_payable(payment, payable, amount):
         )
     )
     return allocation
+
+
+def payment_snapshot(payment):
+    return {
+        "company_id": payment.company_id,
+        "payment_type": payment.payment_type,
+        "party_type": payment.party_type,
+        "customer_id": payment.customer_id,
+        "supplier_id": payment.supplier_id,
+        "payment_date": payment.payment_date,
+        "mode": payment.mode,
+        "reference_number": payment.reference_number,
+        "total_amount": payment.total_amount,
+        "allocated_amount": payment.allocated_amount,
+        "unallocated_amount": payment.unallocated_amount,
+        "allocations": [
+            {
+                "target_type": allocation.target_type,
+                "target_id": allocation.target_id,
+                "amount": allocation.amount,
+            }
+            for allocation in payment.allocations
+        ],
+    }
+
+
+def ensure_editable_payment(payment):
+    if payment.payment_type not in EDITABLE_PAYMENT_TYPES:
+        raise ValueError("Only customer receipts and supplier payments can be edited from Payments.")
+
+
+def reverse_payment_allocations(payment):
+    for allocation in list(payment.allocations):
+        amount = money(allocation.amount)
+        if allocation.target_type == "RECEIVABLE":
+            receivable = db.session.get(Receivable, allocation.target_id)
+            if receivable:
+                receivable.paid_amount = money(max(receivable.paid_amount - amount, Decimal("0.00")))
+                sync_receivable(receivable)
+        elif allocation.target_type == "PAYABLE":
+            payable = db.session.get(Payable, allocation.target_id)
+            if payable:
+                payable.paid_amount = money(max(payable.paid_amount - amount, Decimal("0.00")))
+                sync_payable(payable)
+        db.session.delete(allocation)
+    payment.allocated_amount = Decimal("0.00")
+    payment.unallocated_amount = money(payment.total_amount)
+
+
+def update_payment(payment, data, user):
+    ensure_editable_payment(payment)
+    company = db.session.get(Company, int(data.get("company_id") or payment.company_id))
+    if not company or not company.active:
+        raise ValueError("Company is required.")
+    before = payment_snapshot(payment)
+    reverse_payment_allocations(payment)
+    amount = positive_money(data.get("amount"), "Payment amount")
+
+    payment.company_id = company.id
+    payment.payment_date = parse_date(data.get("payment_date"), "Payment date")
+    payment.mode = data.get("mode") or payment.mode or "CASH"
+    payment.reference_number = data.get("reference_number") or None
+    payment.total_amount = amount
+    payment.allocated_amount = Decimal("0.00")
+    payment.unallocated_amount = amount
+    payment.remarks = data.get("remarks") or None
+    payment.updated_by_id = getattr(user, "id", None)
+
+    if payment.payment_type == "CUSTOMER_RECEIPT":
+        customer = active_customer(data.get("customer_id") or payment.customer_id)
+        payment.party_type = "CUSTOMER"
+        payment.customer_id = customer.id
+        payment.supplier_id = None
+        receivable_id = data.get("receivable_id")
+        if receivable_id:
+            receivable = db.session.get(Receivable, int(receivable_id))
+            if not receivable:
+                raise ValueError("Selected invoice was not found.")
+            allocate_to_receivable(payment, receivable, amount)
+    else:
+        supplier = active_supplier(data.get("supplier_id") or payment.supplier_id)
+        payment.party_type = "SUPPLIER"
+        payment.supplier_id = supplier.id
+        payment.customer_id = None
+        payable_id = data.get("payable_id")
+        if payable_id:
+            payable = db.session.get(Payable, int(payable_id))
+            if not payable:
+                raise ValueError("Selected bill was not found.")
+            allocate_to_payable(payment, payable, amount)
+
+    audit("edit", "Payment", payment.id, payment.reference_number, before=before, after=payment_snapshot(payment), user=user)
+    return payment
+
+
+def delete_payment(payment, user):
+    ensure_editable_payment(payment)
+    before = payment_snapshot(payment)
+    reference = payment.reference_number or str(payment.id)
+    reverse_payment_allocations(payment)
+    db.session.delete(payment)
+    audit("delete", "Payment", payment.id, reference, before=before, user=user)
+    return payment
 
 
 def create_customer_receipt(data, user):

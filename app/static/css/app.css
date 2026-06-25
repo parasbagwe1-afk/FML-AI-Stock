@@ -754,7 +754,7 @@ textarea { min-height: 84px; resize: vertical; }
 .item-combobox-button:hover {
   background: #EEF4F8;
 }
-.primary-button, .secondary-button, .ghost-button, .icon-button, .link-button {
+.primary-button, .secondary-button, .ghost-button, .icon-button, .link-button, .danger-link {
   position: relative;
   border: 0;
   border-radius: 6px;
@@ -775,6 +775,16 @@ textarea { min-height: 84px; resize: vertical; }
 .icon-button { background: #F2F4F7; color: var(--navy); border: 1px solid #D0D5DD; padding: 9px 10px; }
 .link-button { background: transparent; color: var(--danger); padding: 0; }
 .link-button:hover { color: #991B1B; }
+.danger-link {
+  background: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  color: var(--danger);
+}
+.danger-link:hover {
+  background: #FEE2E2;
+  color: #991B1B;
+  transform: translateY(-1px);
+}
 button:disabled {
   cursor: progress;
   opacity: 0.74;

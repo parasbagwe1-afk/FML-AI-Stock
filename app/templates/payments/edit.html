@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block page_title %}Edit Payment{% endblock %}
+{% block page_subtitle %}Correct payment amount, party, date, mode, reference, and allocation.{% endblock %}
+{% block content %}
+  <section class="panel narrow">
+    <form method="post" class="form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Company
+        <select name="company_id" required {% if active_company %}disabled{% endif %}>
+          {% for company in companies %}
+            <option value="{{ company.id }}" {% if company.id == payment.company_id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% if active_company %}<input type="hidden" name="company_id" value="{{ active_company.id }}">{% endif %}
+
+      {% if payment.payment_type == 'CUSTOMER_RECEIPT' %}
+        <label>Customer
+          <select name="customer_id" required>
+            {% for customer in customers %}
+              <option value="{{ customer.id }}" {% if customer.id == payment.customer_id %}selected{% endif %}>{{ customer.code }} - {{ customer.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="full-span">Invoice allocation
+          <select name="receivable_id">
+            <option value="">Treat as advance</option>
+            {% for rec in edit_receivables %}
+              {% if rec.customer %}
+                <option value="{{ rec.id }}" {% if rec.id in allocated_receivable_ids %}selected{% endif %}>{{ rec.company.code }} · {{ rec.customer.name }} · {{ rec.document_number }} · Balance {{ fmt_money(rec.balance_amount) }}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+        </label>
+      {% else %}
+        <label>Supplier
+          <select name="supplier_id" required>
+            {% for supplier in suppliers %}
+              <option value="{{ supplier.id }}" {% if supplier.id == payment.supplier_id %}selected{% endif %}>{{ supplier.code }} - {{ supplier.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="full-span">Bill allocation
+          <select name="payable_id">
+            <option value="">Treat as advance</option>
+            {% for pay in edit_payables %}
+              {% if pay.supplier %}
+                <option value="{{ pay.id }}" {% if pay.id in allocated_payable_ids %}selected{% endif %}>{{ pay.company.code }} · {{ pay.supplier.name }} · {{ pay.document_number }} · Balance {{ fmt_money(pay.balance_amount) }}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+        </label>
+      {% endif %}
+
+      <label>Payment date <input name="payment_date" type="date" value="{{ payment.payment_date }}" required></label>
+      <label>Mode
+        <select name="mode">
+          {% for mode in payment_modes %}
+            <option value="{{ mode.code }}" {% if payment.mode == mode.code %}selected{% endif %}>{{ mode.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Reference <input name="reference_number" value="{{ payment.reference_number or '' }}"></label>
+      <label>Amount <input name="amount" type="number" step="0.01" min="0" value="{{ payment.total_amount }}" required></label>
+      <label class="full-span">Remarks <textarea name="remarks">{{ payment.remarks or '' }}</textarea></label>
+
+      <div class="metric-grid compact-metrics full-span">
+        <article class="metric-card"><span>Current allocated</span><strong>{{ fmt_money(payment.allocated_amount) }}</strong></article>
+        <article class="metric-card amber"><span>Current advance</span><strong>{{ fmt_money(payment.unallocated_amount) }}</strong></article>
+      </div>
+
+      <div class="form-actions full-span">
+        <a class="secondary-button" href="{{ url_for('payments.index') }}">Cancel</a>
+        <button class="primary-button" type="submit">Save Changes</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}

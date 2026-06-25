@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block page_title %}Customers{% endblock %}
+{% block page_subtitle %}Search, identify, and open full customer profiles using customer ID backed links.{% endblock %}
+{% block content %}
+  <section class="panel">
+    <form class="toolbar" method="get" data-live-search-form>
+      <input name="q" placeholder="Search name, company, contact, mobile, GST, city" value="{{ request.args.get('q','') }}" autocomplete="off" data-live-search data-live-target="#customers_table">
+      <select name="company_id" {% if active_company %}disabled{% endif %}>
+        {% if not active_company %}<option value="">All companies</option>{% endif %}
+        {% for company in companies %}
+          <option value="{{ company.id }}" {% if selected_company_id == company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>
+        {% endfor %}
+      </select>
+      {% if active_company %}<input type="hidden" name="company_id" value="{{ active_company.id }}">{% endif %}
+      <select name="active">
+        <option value="active" {% if request.args.get('active','active') == 'active' %}selected{% endif %}>Active</option>
+        <option value="inactive" {% if request.args.get('active') == 'inactive' %}selected{% endif %}>Inactive</option>
+        <option value="all" {% if request.args.get('active') == 'all' %}selected{% endif %}>All</option>
+      </select>
+      <button class="secondary-button" type="submit" data-live-find>Find</button>
+      {% if can(current_user, config.module, 'create') %}
+        <a class="primary-button" href="{{ url_for('masters.create_record', kind=kind) }}">Add</a>
+      {% endif %}
+    </form>
+    <form class="toolbar compact-toolbar" data-customer-jump-form>
+      <input placeholder="Type customer name to open profile" list="customer_jump_options" autocomplete="off" data-customer-jump>
+      <datalist id="customer_jump_options">
+        {% for row in all_rows %}
+          <option value="{{ row.identity }}" data-url="{{ url_for('masters.customer_detail', customer_id=row.customer.id, company_id=selected_company_id or '') }}"></option>
+        {% endfor %}
+      </datalist>
+      <button class="secondary-button" type="submit">Open</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="panel-title">
+      <h2>Customer List</h2>
+      <span class="muted-copy">{{ pagination.total }} record{{ '' if pagination.total == 1 else 's' }}</span>
+    </div>
+    <div class="table-wrap">
+      <table id="customers_table">
+        <thead>
+          <tr><th>Company</th><th>Customer</th><th>Contact</th><th>Mobile</th><th>GST</th><th>City</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            {% set customer = row.customer %}
+            <tr>
+              <td>{{ row.company_label }}</td>
+              <td>
+                <a class="customer-link" href="{{ url_for('masters.customer_detail', customer_id=customer.id, company_id=selected_company_id or '') }}">{{ customer.name }}</a>
+                <small class="customer-subtext">{{ customer.code }}{% if customer.mobile %} · {{ customer.mobile }}{% endif %}{% if customer.city %} · {{ customer.city }}{% endif %}{% if customer.gst_number %} · GST {{ customer.gst_number }}{% endif %}</small>
+              </td>
+              <td>{{ customer.contact_person or '' }}</td>
+              <td>{{ customer.mobile or '' }}</td>
+              <td>{{ customer.gst_number or '' }}</td>
+              <td>{{ customer.city or '' }}</td>
+              <td><span class="status {{ 'ok' if customer.active else 'muted' }}">{{ 'Active' if customer.active else 'Inactive' }}</span></td>
+              <td class="actions">
+                <a class="table-action" href="{{ url_for('masters.customer_detail', customer_id=customer.id, company_id=selected_company_id or '') }}">View Details</a>
+                {% if can(current_user, config.module, 'edit') %}
+                  <a class="table-action" href="{{ url_for('masters.edit_record', kind=kind, record_id=customer.id) }}">Edit</a>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="8" class="empty">No customers found.</td></tr>
+          {% endfor %}
+          <tr class="empty live-empty" data-live-empty hidden><td colspan="8">No matching customers.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    {% if pagination.pages > 1 %}
+      <div class="pagination">
+        {% if pagination.page > 1 %}
+          <a class="secondary-button" href="{{ url_for('masters.list_records', kind='customers', q=request.args.get('q',''), active=request.args.get('active','active'), company_id=selected_company_id or '', page=pagination.page - 1) }}">Previous</a>
+        {% endif %}
+        <span>Page {{ pagination.page }} of {{ pagination.pages }}</span>
+        {% if pagination.page < pagination.pages %}
+          <a class="secondary-button" href="{{ url_for('masters.list_records', kind='customers', q=request.args.get('q',''), active=request.args.get('active','active'), company_id=selected_company_id or '', page=pagination.page + 1) }}">Next</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

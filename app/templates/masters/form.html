@@ -36,8 +36,12 @@
           </select>
         </label>
         <label>GST number <input name="gst_number" value="{{ record.gst_number or '' }}"></label>
+        <label>Contact person <input name="contact_person" value="{{ record.contact_person or '' }}"></label>
         <label>Mobile <input name="mobile" value="{{ record.mobile or '' }}"></label>
+        <label>WhatsApp <input name="whatsapp" value="{{ record.whatsapp or '' }}"></label>
         <label>Email <input name="email" type="email" value="{{ record.email or '' }}"></label>
+        <label>City <input name="city" value="{{ record.city or '' }}"></label>
+        <label>State <input name="state" value="{{ record.state or '' }}"></label>
         <label>Default credit days <input name="default_credit_days" type="number" value="{{ record.default_credit_days if record.default_credit_days is not none else 30 }}"></label>
         <label class="full-span">Address <textarea name="address">{{ record.address or '' }}</textarea></label>
         <label class="full-span">Notes <textarea name="notes">{{ record.notes or '' }}</textarea></label>

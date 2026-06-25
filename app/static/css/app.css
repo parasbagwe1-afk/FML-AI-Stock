@@ -584,6 +584,87 @@ tbody tr:hover { background: #EEF9F6; }
   align-items: center;
 }
 .actions form { margin: 0; }
+.customer-link {
+  color: var(--navy);
+  font-weight: 850;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.customer-link:hover {
+  color: var(--teal);
+  border-bottom-color: currentColor;
+}
+.customer-subtext {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: normal;
+}
+.compact-toolbar {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+  color: var(--muted);
+}
+.tab-nav {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow);
+}
+.tab-nav a {
+  padding: 9px 12px;
+  border-radius: 6px;
+  color: var(--navy);
+  text-decoration: none;
+  font-weight: 800;
+}
+.tab-nav a:hover {
+  background: #EEF9F6;
+  color: var(--teal);
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.detail-grid > div {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #FCFCFD;
+}
+.detail-grid span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+.detail-grid strong {
+  display: block;
+  color: var(--text);
+  font-weight: 800;
+  white-space: normal;
+}
+.compact-metrics {
+  margin-bottom: 0;
+}
 .status {
   display: inline-block;
   padding: 3px 8px;

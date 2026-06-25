@@ -1,12 +1,14 @@
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy.exc import IntegrityError
 
+from app.core.company_context import active_company
 from app.core.formatting import dec, qty
 from app.core.security import require_permission
 from app.extensions import db
 from app.models import Company, Customer, Item, StockBook, Supplier
 from app.services.audit import audit
+from app.services.customer_profile import customer_master_rows, customer_profile, paginate_rows
 
 bp = Blueprint("masters", __name__, url_prefix="/masters")
 
@@ -79,6 +81,8 @@ def index():
 def list_records(kind):
     config = config_or_404(kind)
     require_permission(config["module"], "view")(lambda: None)()
+    if kind == "customers":
+        return list_customers(config)
     model = config["model"]
     query = model.query
     active_filter = request.args.get("active", "active")
@@ -94,6 +98,57 @@ def list_records(kind):
             query = query.filter(model.code.ilike(f"%{search}%"))
     records = query.order_by(getattr(model, "code", getattr(model, "id"))).all()
     return render_template("masters/list.html", kind=kind, config=config, records=records)
+
+
+def selected_customer_company_id():
+    company = active_company()
+    if company:
+        return company.id
+    value = request.args.get("company_id")
+    try:
+        return int(value) if value else None
+    except (TypeError, ValueError):
+        return None
+
+
+def list_customers(config):
+    selected_company_id = selected_customer_company_id()
+    rows = customer_master_rows(
+        search=request.args.get("q"),
+        company_id=selected_company_id,
+        active_filter=request.args.get("active", "active"),
+    )
+    page = request.args.get("page", 1)
+    pagination = paginate_rows(rows, page, 25)
+    companies = Company.query.filter_by(active=True).order_by(Company.code).all()
+    return render_template(
+        "masters/customer_list.html",
+        kind="customers",
+        config=config,
+        rows=pagination["items"],
+        pagination=pagination,
+        all_rows=rows,
+        companies=companies,
+        selected_company_id=selected_company_id,
+    )
+
+
+@bp.route("/customers/<int:customer_id>")
+@login_required
+def customer_detail(customer_id):
+    config = config_or_404("customers")
+    require_permission(config["module"], "view")(lambda: None)()
+    selected_company_id = selected_customer_company_id()
+    profile = customer_profile(customer_id, selected_company_id)
+    if not profile:
+        abort(404)
+    companies = Company.query.filter_by(active=True).order_by(Company.code).all()
+    return render_template(
+        "masters/customer_detail.html",
+        profile=profile,
+        companies=companies,
+        selected_company_id=selected_company_id,
+    )
 
 
 @bp.route("/<kind>/new", methods=["GET", "POST"])
@@ -214,14 +269,18 @@ def apply_form(record, kind):
     elif kind == "customers":
         record.code = form["code"].strip()
         record.name = form["name"].strip()
+        record.contact_person = form.get("contact_person") or None
         customer_type = form.get("customer_type") or "CASH_AND_BILL"
         if customer_type not in {"CASH", "BILL", "CASH_AND_BILL"}:
             raise ValueError("Customer type must be CASH, BILL, or CASH_AND_BILL.")
         record.customer_type = customer_type
         record.gst_number = form.get("gst_number") or None
         record.mobile = form.get("mobile") or None
+        record.whatsapp = form.get("whatsapp") or None
         record.email = form.get("email") or None
         record.address = form.get("address") or None
+        record.city = form.get("city") or None
+        record.state = form.get("state") or None
         record.default_credit_days = int(form.get("default_credit_days") or 0)
         record.notes = form.get("notes") or None
         record.active = bool(form.get("active"))

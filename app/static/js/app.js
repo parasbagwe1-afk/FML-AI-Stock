@@ -127,6 +127,12 @@ document.addEventListener("click", async (event) => {
     applyLiveSearch(input);
   }
 
+  const customerJumpButton = event.target.closest("[data-customer-jump-form] button");
+  if (customerJumpButton) {
+    event.preventDefault();
+    openCustomerJump(customerJumpButton.closest("[data-customer-jump-form]"));
+  }
+
   const itemOpen = event.target.closest("[data-item-open]");
   if (itemOpen) {
     const picker = itemOpen.closest("[data-item-picker]");
@@ -140,6 +146,11 @@ document.addEventListener("click", async (event) => {
 
 document.addEventListener("submit", (event) => {
   const form = event.target;
+  if (form.matches("[data-customer-jump-form]")) {
+    event.preventDefault();
+    openCustomerJump(form);
+    return;
+  }
   if (!validateItemPickers(form)) {
     event.preventDefault();
     return;
@@ -330,6 +341,22 @@ function updateOutstandingSummary() {
   });
 }
 
+function openCustomerJump(form) {
+  const input = form && form.querySelector("[data-customer-jump]");
+  const datalist = input && document.getElementById(input.getAttribute("list"));
+  if (!input || !datalist) return;
+  const value = input.value.trim().toLowerCase();
+  const options = Array.from(datalist.options);
+  const option =
+    options.find((item) => item.value.trim().toLowerCase() === value) ||
+    options.find((item) => value && item.value.trim().toLowerCase().includes(value));
+  if (option?.dataset.url) {
+    window.location.href = option.dataset.url;
+  } else {
+    input.reportValidity();
+  }
+}
+
 function filterStockBookPair(form, companySelector, stockBookSelector, categorySelector) {
   const company = form.querySelector(companySelector);
   const stockBook = form.querySelector(stockBookSelector);
@@ -394,6 +421,12 @@ document.addEventListener("input", (event) => {
 
   if (event.target.matches("[data-live-search]")) {
     applyLiveSearch(event.target);
+  }
+});
+
+document.addEventListener("change", (event) => {
+  if (event.target.matches("[data-customer-jump]")) {
+    openCustomerJump(event.target.closest("[data-customer-jump-form]"));
   }
 });
 

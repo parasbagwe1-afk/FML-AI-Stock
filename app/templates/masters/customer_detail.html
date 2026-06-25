@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% set customer = profile.customer %}
+{% block page_title %}{{ customer.name }}{% endblock %}
+{% block page_subtitle %}Customer profile, invoices, stock, payments, notes, and documents.{% endblock %}
+{% block content %}
+  <section class="panel">
+    <form class="toolbar" method="get">
+      <a class="secondary-button" href="{{ url_for('masters.list_records', kind='customers') }}">Customers</a>
+      <select name="company_id" {% if active_company %}disabled{% endif %}>
+        {% if not active_company %}<option value="">All companies</option>{% endif %}
+        {% for company in companies %}
+          <option value="{{ company.id }}" {% if selected_company_id == company.id %}selected{% endif %}>{{ company.code }} - {{ company.name }}</option>
+        {% endfor %}
+      </select>
+      {% if active_company %}<input type="hidden" name="company_id" value="{{ active_company.id }}">{% endif %}
+      <button class="secondary-button" type="submit">Apply</button>
+      <span class="spacer"></span>
+      {% if can(current_user, 'customers', 'edit') %}
+        <a class="primary-button" href="{{ url_for('masters.edit_record', kind='customers', record_id=customer.id) }}">Edit Customer</a>
+      {% endif %}
+    </form>
+  </section>
+
+  <section class="metric-grid">
+    <article class="metric-card">
+      <span>Total Sales</span>
+      <strong>{{ fmt_money(profile.summary.total_sales) }}</strong>
+      <small>{{ profile.summary.total_invoices }} invoice{{ '' if profile.summary.total_invoices == 1 else 's' }}</small>
+    </article>
+    <article class="metric-card danger">
+      <span>Pending Payment</span>
+      <strong>{{ fmt_money(profile.summary.total_pending) }}</strong>
+      <small>Outstanding balance</small>
+    </article>
+    <article class="metric-card amber">
+      <span>Pending Stock</span>
+      <strong>{{ fmt_qty(profile.summary.pending_stock) }}</strong>
+      <small>From open stock rows</small>
+    </article>
+    <article class="metric-card">
+      <span>Last Transaction</span>
+      <strong>{{ profile.summary.last_transaction or '-' }}</strong>
+      <small>Last payment {{ profile.summary.last_payment or '-' }}</small>
+    </article>
+  </section>
+
+  <nav class="tab-nav">
+    <a href="#overview">Overview</a>
+    <a href="#invoices">Invoices</a>
+    <a href="#challans">Challans</a>
+    <a href="#stock">Stock</a>
+    <a href="#payments">Payments</a>
+    <a href="#documents">Notes / Documents</a>
+  </nav>
+
+  <section class="panel" id="overview">
+    <div class="panel-title"><h2>Overview</h2><span class="muted-copy">Customer ID {{ customer.id }}</span></div>
+    <div class="detail-grid">
+      <div><span>Customer name</span><strong>{{ customer.name }}</strong></div>
+      <div><span>Company</span><strong>{{ profile.companies|map(attribute='code')|join(', ') or '-' }}</strong></div>
+      <div><span>Contact person</span><strong>{{ customer.contact_person or '-' }}</strong></div>
+      <div><span>Mobile</span><strong>{{ customer.mobile or '-' }}</strong></div>
+      <div><span>WhatsApp</span><strong>{{ customer.whatsapp or '-' }}</strong></div>
+      <div><span>Email</span><strong>{{ customer.email or '-' }}</strong></div>
+      <div><span>GST number</span><strong>{{ customer.gst_number or '-' }}</strong></div>
+      <div><span>City / State</span><strong>{{ customer.city or '-' }}{% if customer.state %}, {{ customer.state }}{% endif %}</strong></div>
+      <div class="full-span"><span>Address</span><strong>{{ customer.address or '-' }}</strong></div>
+      <div class="full-span"><span>Notes</span><strong>{{ customer.notes or '-' }}</strong></div>
+    </div>
+  </section>
+
+  <section class="panel" id="invoices">
+    <div class="panel-title"><h2>Invoices</h2><span class="muted-copy">{{ profile.invoices|length }} invoice{{ '' if profile.invoices|length == 1 else 's' }}</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Date</th><th>Company</th><th>Invoice</th><th>Type</th><th>Total</th><th>Paid</th><th>Pending</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for sale in profile.invoices %}
+            <tr><td>{{ sale.invoice_date }}</td><td>{{ sale.company.code }}</td><td>{{ sale.invoice_number }}</td><td>{{ sale.sale_type }}</td><td>{{ fmt_money(sale.grand_total) }}</td><td>{{ fmt_money(sale.paid_amount) }}</td><td>{{ fmt_money(sale.balance_amount) }}</td><td>{{ sale.payment_status }}</td><td class="actions"><a class="table-action" href="{{ url_for('transactions.sale_edit', sale_id=sale.id) }}">Edit</a><a class="table-action" href="{{ url_for('transactions.sale_export', sale_id=sale.id, fmt='pdf') }}">PDF</a></td></tr>
+          {% else %}
+            <tr><td colspan="9" class="empty">No invoices.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" id="challans">
+    <div class="panel-title"><h2>Challans</h2><span class="muted-copy">Invoice-backed item movement</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Challan No.</th><th>Challan Date</th><th>Item</th><th>Quantity</th><th>Weight</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for row in profile.stock_rows %}
+            <tr><td>{{ row.challan_number }}</td><td>{{ row.challan_date }}</td><td>{{ row.item }}</td><td>{{ fmt_qty(row.quantity) }}</td><td>{{ row.weight }}</td><td>{{ row.status }}</td><td><a class="table-action" href="{{ url_for('transactions.sale_export', sale_id=row.sale.id, fmt='pdf') }}">PDF</a></td></tr>
+          {% else %}
+            <tr><td colspan="7" class="empty">No challan rows.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" id="stock">
+    <div class="panel-title"><h2>Stock</h2><span class="muted-copy">Given, received back, and pending</span></div>
+    <div class="metric-grid compact-metrics">
+      <article class="metric-card"><span>Stock Given</span><strong>{{ fmt_qty(profile.summary.stock_given) }}</strong></article>
+      <article class="metric-card"><span>Stock Received Back</span><strong>{{ fmt_qty(profile.summary.stock_received) }}</strong></article>
+      <article class="metric-card amber"><span>Pending Stock</span><strong>{{ fmt_qty(profile.summary.pending_stock) }}</strong></article>
+    </div>
+  </section>
+
+  <section class="panel" id="payments">
+    <div class="panel-title"><h2>Payments</h2><span class="muted-copy">{{ profile.payments|length }} payment{{ '' if profile.payments|length == 1 else 's' }}</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Date</th><th>Company</th><th>Mode</th><th>Amount</th><th>Allocated</th><th>Unallocated</th><th>Reference</th><th>Remarks</th></tr></thead>
+        <tbody>
+          {% for payment in profile.payments %}
+            <tr><td>{{ payment.payment_date }}</td><td>{{ payment.company.code }}</td><td>{{ payment.mode }}</td><td>{{ fmt_money(payment.total_amount) }}</td><td>{{ fmt_money(payment.allocated_amount) }}</td><td>{{ fmt_money(payment.unallocated_amount) }}</td><td>{{ payment.reference_number or '' }}</td><td>{{ payment.remarks or '' }}</td></tr>
+          {% else %}
+            <tr><td colspan="8" class="empty">No payments.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" id="documents">
+    <div class="panel-title"><h2>Notes / Documents</h2><span class="muted-copy">Generated documents linked by customer ID</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Date</th><th>Type</th><th>Document</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for document in profile.documents %}
+            <tr><td>{{ document.date }}</td><td>{{ document.type }}</td><td>{{ document.label }}</td><td><a class="table-action" href="{{ url_for('transactions.sale_export', sale_id=document.sale.id, fmt='pdf') }}">Open PDF</a></td></tr>
+          {% else %}
+            <tr><td colspan="4" class="empty">No generated documents.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

@@ -20,6 +20,7 @@ def create_app(config_object=None):
     from app import models  # noqa: F401
     from app.auth.routes import bp as auth_bp
     from app.company.routes import bp as company_bp
+    from app.customers.routes import bp as customers_api_bp
     from app.dashboard.routes import bp as dashboard_bp
     from app.masters.routes import bp as masters_bp
     from app.payments.routes import bp as payments_bp
@@ -29,6 +30,7 @@ def create_app(config_object=None):
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(company_bp)
+    app.register_blueprint(customers_api_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(masters_bp)
     app.register_blueprint(transactions_bp)

@@ -162,6 +162,88 @@ def test_cash_sale_forces_zero_gst_on_create_and_edit(app):
         assert line.gst_amount == 0
 
 
+def test_sale_edit_can_change_cash_to_gst_and_reprice_lines(app):
+    with app.app_context():
+        data = ids()
+        cash_book = StockBook.query.filter_by(code="AI_CASH").one()
+        gst_book = StockBook.query.filter_by(code="AI_GST").one()
+        create_opening_stock(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": cash_book.id,
+                "reference_number": "SALE-TYPE-CASH-STOCK",
+                "opening_date": "2026-06-01",
+            },
+            [{"item_id": data["item"].id, "quantity": "10", "rate": "100"}],
+            admin(),
+        )
+        create_opening_stock(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": gst_book.id,
+                "reference_number": "SALE-TYPE-GST-STOCK",
+                "opening_date": "2026-06-01",
+            },
+            [{"item_id": data["item"].id, "quantity": "10", "rate": "100"}],
+            admin(),
+        )
+        sale = create_sale(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": cash_book.id,
+                "customer_id": data["customer"].id,
+                "sale_type": "CASH",
+                "invoice_number": "TYPE-SWITCH-INV",
+                "invoice_date": "2026-06-02",
+            },
+            [{"item_id": data["item"].id, "quantity": "2", "rate": "150", "gst_percent": "18"}],
+            admin(),
+        )
+        db.session.flush()
+        line = sale.lines[0]
+
+        update_sale_header(
+            sale,
+            {
+                "customer_id": data["customer"].id,
+                "stock_book_id": gst_book.id,
+                "sale_type": "GST",
+                "invoice_number": "TYPE-SWITCH-INV",
+                "invoice_date": "2026-06-02",
+            },
+            admin(),
+        )
+        update_sale_lines(
+            sale,
+            [
+                {
+                    "line_id": line.id,
+                    "item_id": data["item"].id,
+                    "quantity": "2",
+                    "rate": "150",
+                    "gst_percent": "18",
+                }
+            ],
+            admin(),
+        )
+        db.session.commit()
+
+        receivable = Receivable.query.filter_by(source_type="SALE", source_id=sale.id).one()
+        ledger = StockLedgerEntry.query.filter_by(
+            transaction_type="SALE", transaction_id=sale.id
+        ).one()
+        assert sale.sale_type == "GST"
+        assert sale.stock_book_id == gst_book.id
+        assert sale.gst_total == 54
+        assert sale.grand_total == 354
+        assert line.gst_percent == 18
+        assert receivable.transaction_type == "GST"
+        assert receivable.total_amount == 354
+        assert ledger.stock_book_id == gst_book.id
+        assert available_quantity(data["ai"].id, cash_book.id, data["item"].id) == 10
+        assert available_quantity(data["ai"].id, gst_book.id, data["item"].id) == 8
+
+
 def test_sale_edit_can_add_item_line_before_receipt_allocation(app):
     with app.app_context():
         data = ids()
@@ -314,6 +396,9 @@ def test_company_user_sees_edit_for_existing_sale(client, app):
     assert b"SALES-EDIT-INV" in edit_response.data
     assert b"data-item-search" in edit_response.data
     assert b"data-item-value" in edit_response.data
+    assert b'name="sale_type"' in edit_response.data
+    assert b'name="stock_book_id"' in edit_response.data
+    assert b"data-document-total-preview" in edit_response.data
 
 
 def test_transfer_header_edit_updates_linked_references(app):

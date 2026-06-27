@@ -145,6 +145,200 @@ def _sync_receivable_from_sale(sale):
     receivable.updated_by_id = sale.updated_by_id
 
 
+def _sync_sale_fifo_from_consumptions(sale_ids, user):
+    user_id = getattr(user, "id", None)
+    for sale_id in sorted(sale_ids):
+        sale = db.session.get(Sale, sale_id)
+        if not sale or sale.is_void:
+            continue
+        StockLedgerEntry.query.filter_by(
+            transaction_type="SALE", transaction_id=sale.id
+        ).delete(synchronize_session=False)
+        fifo_total = Decimal("0.00")
+        for line in sorted(sale.lines, key=lambda sale_line: sale_line.id):
+            consumptions = (
+                FIFOConsumption.query.filter_by(
+                    source_type="SALE",
+                    source_id=sale.id,
+                    source_line_id=line.id,
+                )
+                .order_by(FIFOConsumption.id)
+                .all()
+            )
+            fifo_cost = Decimal("0.00")
+            covered_quantity = Decimal("0.000")
+            for consumption in consumptions:
+                fifo_cost = money(fifo_cost + consumption.value)
+                covered_quantity = qty(covered_quantity + consumption.quantity)
+                stock_ledger(
+                    sale.company_id,
+                    sale.stock_book_id,
+                    line.item_id,
+                    sale.invoice_date,
+                    "OUT",
+                    "SALE",
+                    sale.id,
+                    sale.invoice_number,
+                    consumption.quantity,
+                    consumption.rate,
+                    "Sale stock out",
+                    user_id,
+                )
+            shortage_quantity = qty(line.quantity - covered_quantity)
+            if shortage_quantity > Decimal("0.000"):
+                stock_ledger(
+                    sale.company_id,
+                    sale.stock_book_id,
+                    line.item_id,
+                    sale.invoice_date,
+                    "OUT",
+                    "SALE",
+                    sale.id,
+                    sale.invoice_number,
+                    shortage_quantity,
+                    Decimal("0.0000"),
+                    "Sale stock out (negative stock)",
+                    user_id,
+                )
+            line.fifo_cost = fifo_cost
+            line.gross_profit = money(line.subtotal - fifo_cost)
+            fifo_total = money(fifo_total + fifo_cost)
+        sale.fifo_cost = fifo_total
+        sale.gross_profit = money(sale.subtotal - fifo_total)
+
+
+def _sync_transfer_fifo_from_consumptions(transfer_ids, user):
+    user_id = getattr(user, "id", None)
+    for transfer_id in sorted(transfer_ids):
+        transfer = db.session.get(InterCompanyTransfer, transfer_id)
+        if not transfer or transfer.is_void:
+            continue
+        StockLedgerEntry.query.filter_by(
+            transaction_type="TRANSFER", transaction_id=transfer.id
+        ).delete(synchronize_session=False)
+        ledger_entries = (
+            InterCompanyLedgerEntry.query.filter_by(transfer_id=transfer.id)
+            .order_by(InterCompanyLedgerEntry.id)
+            .all()
+        )
+        total = Decimal("0.00")
+        for index, line in enumerate(
+            sorted(transfer.lines, key=lambda transfer_line: transfer_line.id)
+        ):
+            consumptions = (
+                FIFOConsumption.query.filter_by(
+                    source_type="TRANSFER",
+                    source_id=transfer.id,
+                    source_line_id=line.id,
+                )
+                .order_by(FIFOConsumption.id)
+                .all()
+            )
+            line_value = Decimal("0.00")
+            covered_quantity = Decimal("0.000")
+            for consumption in consumptions:
+                line_value = money(line_value + consumption.value)
+                covered_quantity = qty(covered_quantity + consumption.quantity)
+                stock_ledger(
+                    transfer.from_company_id,
+                    transfer.from_stock_book_id,
+                    line.item_id,
+                    transfer.transfer_date,
+                    "OUT",
+                    "TRANSFER",
+                    transfer.id,
+                    transfer.reference_number,
+                    consumption.quantity,
+                    consumption.rate,
+                    "Inter-company stock issued",
+                    user_id,
+                )
+            shortage_quantity = qty(line.quantity - covered_quantity)
+            if shortage_quantity > Decimal("0.000"):
+                stock_ledger(
+                    transfer.from_company_id,
+                    transfer.from_stock_book_id,
+                    line.item_id,
+                    transfer.transfer_date,
+                    "OUT",
+                    "TRANSFER",
+                    transfer.id,
+                    transfer.reference_number,
+                    shortage_quantity,
+                    Decimal("0.0000"),
+                    "Inter-company stock issued (negative stock)",
+                    user_id,
+                )
+            line.fifo_value = line_value
+            total = money(total + line_value)
+            if index < len(ledger_entries):
+                ledger_entry = ledger_entries[index]
+                ledger_entry.item_id = line.item_id
+                ledger_entry.quantity = line.quantity
+                ledger_entry.amount_owed = line_value
+                ledger_entry.balance_amount = money(
+                    line_value - ledger_entry.settled_amount
+                )
+                ledger_entry.status = "PENDING"
+        transfer.total_fifo_value = total
+
+
+def _retarget_purchase_fifo_layer(layer, line, previous_item_id, item, quantity, rate):
+    consumptions = (
+        FIFOConsumption.query.filter_by(fifo_layer_id=layer.id)
+        .order_by(FIFOConsumption.id)
+        .all()
+    )
+    affected_sale_ids = {
+        consumption.source_id
+        for consumption in consumptions
+        if consumption.source_type == "SALE"
+    }
+    affected_transfer_ids = {
+        consumption.source_id
+        for consumption in consumptions
+        if consumption.source_type == "TRANSFER"
+    }
+    retained_quantity = Decimal("0.000")
+    keep_consumptions = item.id == previous_item_id
+    total_consumed_quantity = sum(
+        (qty(consumption.quantity) for consumption in consumptions), Decimal("0.000")
+    )
+    if affected_transfer_ids and (
+        not keep_consumptions or quantity < total_consumed_quantity
+    ):
+        raise ValueError(
+            "Purchase stock already issued in transfers cannot be reduced below issued quantity "
+            "or changed to another item."
+        )
+    for consumption in consumptions:
+        remaining_capacity = (
+            qty(quantity - retained_quantity) if keep_consumptions else Decimal("0.000")
+        )
+        if remaining_capacity <= Decimal("0.000"):
+            db.session.delete(consumption)
+            continue
+        original_quantity = qty(consumption.quantity)
+        kept_quantity = min(original_quantity, remaining_capacity)
+        consumption.quantity = kept_quantity
+        consumption.rate = rate
+        consumption.value = money(kept_quantity * rate)
+        retained_quantity = qty(retained_quantity + kept_quantity)
+
+    layer.company_id = line.purchase.company_id
+    layer.stock_book_id = line.purchase.stock_book_id
+    layer.item_id = item.id
+    layer.source_reference = line.purchase.bill_number
+    layer.source_date = line.purchase.bill_date
+    layer.original_quantity = quantity
+    layer.available_quantity = qty(quantity - retained_quantity)
+    layer.unit_cost = rate
+    layer.original_value = money(quantity * rate)
+    layer.available_value = money(layer.available_quantity * rate)
+    layer.status = layer_status(layer)
+    return affected_sale_ids, affected_transfer_ids
+
+
 def _line_rows_by_id(lines, existing_lines, label):
     rows = _clean_lines(lines)
     existing = {str(line.id): line for line in existing_lines}
@@ -644,8 +838,11 @@ def update_purchase_lines(purchase, lines, data, user):
     subtotal_total = Decimal("0.00")
     gst_total = Decimal("0.00")
     grand_total = Decimal("0.00")
+    affected_sale_ids = set()
+    affected_transfer_ids = set()
 
     for line, row in ordered:
+        previous_item_id = line.item_id
         item = active_item(row.get("item_id") or line.item_id)
         quantity = positive_qty(row.get("quantity"))
         rate = Decimal(row.get("rate"))
@@ -663,8 +860,6 @@ def update_purchase_lines(purchase, lines, data, user):
             source_id=purchase.id,
             source_line_id=line.id,
         ).first()
-        if changed and layer and qty(layer.available_quantity) != qty(layer.original_quantity):
-            raise ValueError("Purchase item price or quantity cannot be changed after that stock has been consumed.")
 
         subtotal, gst_amount, line_total = _line_total(quantity, rate, gst_percent, taxable)
         line.quantity = quantity
@@ -681,7 +876,13 @@ def update_purchase_lines(purchase, lines, data, user):
             layer.item_id = item.id
             layer.source_reference = purchase.bill_number
             layer.source_date = purchase.bill_date
-            if changed or qty(layer.available_quantity) == qty(layer.original_quantity):
+            if qty(layer.available_quantity) != qty(layer.original_quantity):
+                sale_ids, transfer_ids = _retarget_purchase_fifo_layer(
+                    layer, line, previous_item_id, item, quantity, rate
+                )
+                affected_sale_ids.update(sale_ids)
+                affected_transfer_ids.update(transfer_ids)
+            elif changed or qty(layer.available_quantity) == qty(layer.original_quantity):
                 layer.original_quantity = quantity
                 layer.available_quantity = quantity
                 layer.unit_cost = rate
@@ -754,6 +955,8 @@ def update_purchase_lines(purchase, lines, data, user):
     purchase.grand_total = grand_total
     _sync_purchase_payment(purchase, data)
     _sync_payable_from_purchase(purchase)
+    _sync_sale_fifo_from_consumptions(affected_sale_ids, user)
+    _sync_transfer_fifo_from_consumptions(affected_transfer_ids, user)
 
     audit(
         "edit_lines",
@@ -882,6 +1085,15 @@ def create_sale(data, lines, user):
 def update_sale_header(sale, data, user):
     _ensure_not_void(sale, "Sale")
     customer = active_customer(data.get("customer_id"))
+    sale_type = (data.get("sale_type") or sale.sale_type or "").upper()
+    if sale_type not in {"GST", "CASH"}:
+        raise ValueError("Invalid sale type.")
+    _company, stock_book = validate_company_book(
+        sale.company_id,
+        data.get("stock_book_id") or sale.stock_book_id,
+        sale_type,
+        "sale",
+    )
     invoice_number = data.get("invoice_number", "").strip()
     if not invoice_number:
         raise ValueError("Invoice number is required.")
@@ -893,9 +1105,14 @@ def update_sale_header(sale, data, user):
     )
     if sale.paid_amount and sale.customer_id != customer.id:
         raise ValueError("Customer cannot be changed after receipt allocation.")
+    category_changed = sale.stock_book_id != stock_book.id or sale.sale_type != sale_type
+    if sale.paid_amount and category_changed:
+        raise ValueError("Sale type or stock book cannot be changed after receipt allocation.")
 
     before = {
         "customer_id": sale.customer_id,
+        "stock_book_id": sale.stock_book_id,
+        "sale_type": sale.sale_type,
         "invoice_number": sale.invoice_number,
         "invoice_date": sale.invoice_date,
         "due_date": sale.due_date,
@@ -903,22 +1120,26 @@ def update_sale_header(sale, data, user):
     }
 
     sale.customer_id = customer.id
+    sale.stock_book_id = stock_book.id
+    sale.sale_type = sale_type
     sale.invoice_number = invoice_number
     sale.invoice_date = invoice_date
     sale.due_date = due_date
     sale.remarks = data.get("remarks") or None
     sale.updated_by_id = getattr(user, "id", None)
+    sale._force_line_recalc = category_changed
 
     receivable = Receivable.query.filter_by(source_type="SALE", source_id=sale.id).first()
     if receivable:
         _sync_receivable_from_sale(sale)
 
-    StockLedgerEntry.query.filter_by(
-        transaction_type="SALE", transaction_id=sale.id
-    ).update(
-        {"reference_number": invoice_number, "entry_date": invoice_date},
-        synchronize_session=False,
-    )
+    if not category_changed:
+        StockLedgerEntry.query.filter_by(
+            transaction_type="SALE", transaction_id=sale.id
+        ).update(
+            {"reference_number": invoice_number, "entry_date": invoice_date},
+            synchronize_session=False,
+        )
 
     audit(
         "edit",
@@ -928,6 +1149,8 @@ def update_sale_header(sale, data, user):
         before=before,
         after={
             "customer_id": sale.customer_id,
+            "stock_book_id": sale.stock_book_id,
+            "sale_type": sale.sale_type,
             "invoice_number": sale.invoice_number,
             "invoice_date": sale.invoice_date,
             "due_date": sale.due_date,
@@ -952,7 +1175,7 @@ def update_sale_lines(sale, lines, user):
         for line in sale.lines
     ]
     ordered, new_rows = _line_rows_for_edit(lines, sale.lines, "Sale")
-    changed = bool(new_rows)
+    changed = bool(new_rows) or bool(getattr(sale, "_force_line_recalc", False))
     parsed = []
     for line, row in ordered:
         item = active_item(row.get("item_id") or line.item_id)

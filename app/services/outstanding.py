@@ -137,6 +137,8 @@ def grouped_party_outstanding(entries, party_kind):
     for group in sorted(groups.values(), key=lambda item: (item["due_date"] or date.max, item["party"])):
         advance_amount = advances.get((group["company_id"], group["party_id"]), Decimal("0.00"))
         net_group_with_advances(group, advance_amount)
+        if money(group["balance"]) <= Decimal("0.00"):
+            continue
         group["documents_label"] = document_summary(group["documents"])
         group["status"] = outstanding_status(group["paid"], group["balance"])
         rows.append(group)

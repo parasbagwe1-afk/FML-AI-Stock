@@ -47,7 +47,9 @@ REPORT_TITLES = {
     "stock-ledger": "Stock Ledger",
     "item-ledger": "Item Movement Ledger",
     "purchases": "Purchase Report",
+    "purchases-monthly": "Monthly Purchase Report",
     "sales": "Sales Report",
+    "sales-monthly": "Monthly Sales Report",
     "sales-by-type": "Sales by Company and Type",
     "customer-ledger": "Customer Ledger",
     "gross-profit": "Gross Profit Report",
@@ -393,7 +395,9 @@ def build_report(name):
         "fifo-layers": fifo_layer_rows,
         "stock-ledger": stock_ledger_rows,
         "purchases": purchase_rows,
+        "purchases-monthly": purchase_monthly_rows,
         "sales": sales_rows,
+        "sales-monthly": sales_monthly_rows,
         "sales-by-type": sales_by_type_rows,
         "gross-profit": gross_profit_rows,
         "customer-outstanding": customer_outstanding_rows,
@@ -504,6 +508,48 @@ def purchase_rows():
     return headers, rows
 
 
+def purchase_monthly_rows():
+    headers = ["Month", "Company", "Bills", "Subtotal", "GST", "Grand total", "Paid", "Balance"]
+    groups = {}
+    query = scope_query_to_active_company(Purchase.query.filter_by(is_void=False), Purchase.company_id)
+    for purchase in query.all():
+        key = (purchase.bill_date.strftime("%Y-%m"), purchase.company.code)
+        group = groups.setdefault(
+            key,
+            {
+                "month": key[0],
+                "company": key[1],
+                "bills": 0,
+                "subtotal": Decimal("0.00"),
+                "gst": Decimal("0.00"),
+                "grand": Decimal("0.00"),
+                "paid": Decimal("0.00"),
+                "balance": Decimal("0.00"),
+            },
+        )
+        group["bills"] += 1
+        group["subtotal"] = money(group["subtotal"] + purchase.subtotal)
+        group["gst"] = money(group["gst"] + purchase.gst_total)
+        group["grand"] = money(group["grand"] + purchase.grand_total)
+        group["paid"] = money(group["paid"] + purchase.paid_amount)
+        group["balance"] = money(group["balance"] + purchase.balance_amount)
+    rows = []
+    for group in sorted(
+        groups.values(), key=lambda item: (item["month"], item["company"]), reverse=True
+    ):
+        rows.append([
+            group["month"],
+            group["company"],
+            group["bills"],
+            fmt_money(group["subtotal"]),
+            fmt_money(group["gst"]),
+            fmt_money(group["grand"]),
+            fmt_money(group["paid"]),
+            fmt_money(group["balance"]),
+        ])
+    return headers, rows
+
+
 def sales_rows():
     headers = ["Date", "Company", "Book", "Customer", "Invoice", "Type", "Subtotal", "GST", "Grand total", "FIFO cost", "Gross profit", "Balance", "Status", "Created by"]
     rows = []
@@ -524,6 +570,61 @@ def sales_rows():
             fmt_money(sale.balance_amount),
             sale.payment_status,
             creator_name(sale.created_by_id),
+        ])
+    return headers, rows
+
+
+def sales_monthly_rows():
+    headers = [
+        "Month",
+        "Company",
+        "Invoices",
+        "Subtotal",
+        "GST",
+        "Grand total",
+        "FIFO cost",
+        "Gross profit",
+        "Balance",
+    ]
+    groups = {}
+    query = scope_query_to_active_company(Sale.query.filter_by(is_void=False), Sale.company_id)
+    for sale in query.all():
+        key = (sale.invoice_date.strftime("%Y-%m"), sale.company.code)
+        group = groups.setdefault(
+            key,
+            {
+                "month": key[0],
+                "company": key[1],
+                "invoices": 0,
+                "subtotal": Decimal("0.00"),
+                "gst": Decimal("0.00"),
+                "grand": Decimal("0.00"),
+                "fifo": Decimal("0.00"),
+                "profit": Decimal("0.00"),
+                "balance": Decimal("0.00"),
+            },
+        )
+        group["invoices"] += 1
+        group["subtotal"] = money(group["subtotal"] + sale.subtotal)
+        group["gst"] = money(group["gst"] + sale.gst_total)
+        group["grand"] = money(group["grand"] + sale.grand_total)
+        group["fifo"] = money(group["fifo"] + sale.fifo_cost)
+        group["profit"] = money(group["profit"] + sale.gross_profit)
+        group["balance"] = money(group["balance"] + sale.balance_amount)
+    rows = []
+    for group in sorted(
+        groups.values(), key=lambda item: (item["month"], item["company"]), reverse=True
+    ):
+        rows.append([
+            group["month"],
+            group["company"],
+            group["invoices"],
+            fmt_money(group["subtotal"]),
+            fmt_money(group["gst"]),
+            fmt_money(group["grand"]),
+            fmt_money(group["fifo"]),
+            fmt_money(group["profit"]),
+            fmt_money(group["balance"]),
         ])
     return headers, rows
 
@@ -595,14 +696,20 @@ def format_grouped_outstanding_rows(entries, party_kind):
 
 def customer_outstanding_rows():
     headers = ["Company", "Customer", "Documents", "First date", "Next due", "Debit bills", "Credit received", "Advance credit", "Closing balance", "Status", "Created by"]
-    query = scope_query_to_active_company(Receivable.query, Receivable.company_id)
+    query = scope_query_to_active_company(
+        Receivable.query.filter(Receivable.balance_amount > 0),
+        Receivable.company_id,
+    )
     entries = query.order_by(Receivable.due_date, Receivable.document_number).all()
     return headers, format_grouped_outstanding_rows(entries, "customer")
 
 
 def supplier_outstanding_rows():
     headers = ["Company", "Supplier", "Documents", "First date", "Next due", "Debit bills", "Credit paid", "Advance", "Closing balance", "Status", "Created by"]
-    query = scope_query_to_active_company(Payable.query, Payable.company_id)
+    query = scope_query_to_active_company(
+        Payable.query.filter(Payable.balance_amount > 0),
+        Payable.company_id,
+    )
     entries = query.order_by(Payable.due_date, Payable.document_number).all()
     return headers, format_grouped_outstanding_rows(entries, "supplier")
 

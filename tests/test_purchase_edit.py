@@ -1,10 +1,23 @@
-from app.extensions import db
-import pytest
 from decimal import Decimal
 
-from app.models import FIFOLayer, Item, Payable, Purchase, PurchaseLine, StockLedgerEntry, StockBook
+from app.extensions import db
+from app.models import (
+    FIFOConsumption,
+    FIFOLayer,
+    Item,
+    Payable,
+    Purchase,
+    PurchaseLine,
+    StockLedgerEntry,
+    StockBook,
+)
 from app.services.stock import available_quantity
-from app.services.transactions import create_purchase, create_sale, update_purchase_header, update_purchase_lines
+from app.services.transactions import (
+    create_purchase,
+    create_sale,
+    update_purchase_header,
+    update_purchase_lines,
+)
 from tests.test_fifo_workflows import admin, ids
 from tests.test_navigation import login
 
@@ -22,7 +35,14 @@ def test_purchase_header_edit_updates_linked_references(app):
                 "bill_date": "2026-06-01",
                 "due_date": "2026-06-15",
             },
-            [{"item_id": data["item"].id, "quantity": "2", "rate": "100", "gst_percent": "18"}],
+            [
+                {
+                    "item_id": data["item"].id,
+                    "quantity": "2",
+                    "rate": "100",
+                    "gst_percent": "18",
+                }
+            ],
             admin(),
         )
         db.session.flush()
@@ -133,7 +153,15 @@ def test_purchase_edit_updates_item_quantity_rate_and_stock(app):
         )
         update_purchase_lines(
             purchase,
-            [{"line_id": line.id, "item_id": data["item"].id, "quantity": "3", "rate": "125", "gst_percent": "18"}],
+            [
+                {
+                    "line_id": line.id,
+                    "item_id": data["item"].id,
+                    "quantity": "3",
+                    "rate": "125",
+                    "gst_percent": "18",
+                }
+            ],
             {"payment_status": "UNPAID"},
             admin(),
         )
@@ -264,7 +292,7 @@ def test_purchase_edit_can_change_item_before_stock_is_consumed(app):
         assert available_quantity(data["ai"].id, data["ai_gst"].id, replacement_item.id) == 3
 
 
-def test_purchase_edit_rejects_line_change_after_stock_consumed(app):
+def test_purchase_edit_updates_consumed_fifo_costs(app):
     with app.app_context():
         data = ids()
         purchase = create_purchase(
@@ -279,7 +307,7 @@ def test_purchase_edit_rejects_line_change_after_stock_consumed(app):
             [{"item_id": data["item"].id, "quantity": "2", "rate": "100", "gst_percent": "18"}],
             admin(),
         )
-        create_sale(
+        sale = create_sale(
             {
                 "company_id": data["ai"].id,
                 "stock_book_id": data["ai_gst"].id,
@@ -288,19 +316,135 @@ def test_purchase_edit_rejects_line_change_after_stock_consumed(app):
                 "invoice_number": "CONSUME-INV",
                 "invoice_date": "2026-06-02",
             },
-            [{"item_id": data["item"].id, "quantity": "1", "rate": "150", "gst_percent": "18"}],
+            [
+                {
+                    "item_id": data["item"].id,
+                    "quantity": "1",
+                    "rate": "150",
+                    "gst_percent": "18",
+                }
+            ],
             admin(),
         )
         db.session.flush()
         line = purchase.lines[0]
 
-        with pytest.raises(ValueError):
-            update_purchase_lines(
-                purchase,
-                [{"line_id": line.id, "item_id": data["item"].id, "quantity": "3", "rate": "100", "gst_percent": "18"}],
-                {"payment_status": "UNPAID"},
-                admin(),
-            )
+        update_purchase_lines(
+            purchase,
+            [
+                {
+                    "line_id": line.id,
+                    "item_id": data["item"].id,
+                    "quantity": "3",
+                    "rate": "125",
+                    "gst_percent": "18",
+                }
+            ],
+            {"payment_status": "UNPAID"},
+            admin(),
+        )
+        db.session.commit()
+
+        layer = FIFOLayer.query.filter_by(source_type="PURCHASE", source_id=purchase.id).one()
+        consumption = FIFOConsumption.query.filter_by(fifo_layer_id=layer.id).one()
+        sale_ledger = StockLedgerEntry.query.filter_by(
+            transaction_type="SALE", reference_number="CONSUME-INV"
+        ).one()
+
+        assert purchase.grand_total == Decimal("442.50")
+        assert layer.original_quantity == 3
+        assert layer.available_quantity == 2
+        assert layer.unit_cost == 125
+        assert consumption.quantity == 1
+        assert consumption.rate == 125
+        assert consumption.value == 125
+        assert sale.fifo_cost == 125
+        assert sale.gross_profit == 25
+        assert sale_ledger.quantity_out == 1
+        assert sale_ledger.rate == 125
+        assert sale_ledger.value == 125
+        assert available_quantity(data["ai"].id, data["ai_gst"].id, data["item"].id) == 2
+
+
+def test_purchase_edit_can_reduce_consumed_quantity_to_negative_stock(app):
+    with app.app_context():
+        data = ids()
+        purchase = create_purchase(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "supplier_id": data["supplier"].id,
+                "purchase_type": "GST",
+                "bill_number": "CONSUMED-REDUCE-BILL",
+                "bill_date": "2026-06-01",
+            },
+            [
+                {
+                    "item_id": data["item"].id,
+                    "quantity": "2",
+                    "rate": "100",
+                    "gst_percent": "0",
+                }
+            ],
+            admin(),
+        )
+        sale = create_sale(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "customer_id": data["customer"].id,
+                "sale_type": "GST",
+                "invoice_number": "CONSUME-REDUCE-INV",
+                "invoice_date": "2026-06-02",
+            },
+            [
+                {
+                    "item_id": data["item"].id,
+                    "quantity": "2",
+                    "rate": "150",
+                    "gst_percent": "0",
+                }
+            ],
+            admin(),
+        )
+        db.session.flush()
+        line = purchase.lines[0]
+
+        update_purchase_lines(
+            purchase,
+            [
+                {
+                    "line_id": line.id,
+                    "item_id": data["item"].id,
+                    "quantity": "1",
+                    "rate": "100",
+                    "gst_percent": "0",
+                }
+            ],
+            {"payment_status": "UNPAID"},
+            admin(),
+        )
+        db.session.commit()
+
+        layer = FIFOLayer.query.filter_by(source_type="PURCHASE", source_id=purchase.id).one()
+        consumption = FIFOConsumption.query.filter_by(fifo_layer_id=layer.id).one()
+        sale_ledgers = StockLedgerEntry.query.filter_by(
+            transaction_type="SALE", reference_number="CONSUME-REDUCE-INV"
+        ).order_by(StockLedgerEntry.rate.desc()).all()
+
+        assert purchase.grand_total == 100
+        assert layer.original_quantity == 1
+        assert layer.available_quantity == 0
+        assert consumption.quantity == 1
+        assert consumption.value == 100
+        assert sale.fifo_cost == 100
+        assert sale.gross_profit == 200
+        assert [ledger.quantity_out for ledger in sale_ledgers] == [
+            Decimal("1.000"),
+            Decimal("1.000"),
+        ]
+        assert [ledger.value for ledger in sale_ledgers] == [Decimal("100.00"), Decimal("0.00")]
+        assert available_quantity(data["ai"].id, data["ai_gst"].id, data["item"].id) == -1
 
 
 def test_purchase_edit_page_renders(client, app):
@@ -328,6 +472,7 @@ def test_purchase_edit_page_renders(client, app):
     assert b"UI-BILL" in response.data
     assert b"data-item-search" in response.data
     assert b"data-item-value" in response.data
+    assert b"data-document-total-preview" in response.data
 
 
 def test_company_user_sees_edit_for_existing_purchase(client, app):

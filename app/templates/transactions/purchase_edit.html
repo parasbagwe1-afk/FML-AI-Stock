@@ -42,7 +42,7 @@
         <input name="due_date" type="date" value="{{ purchase.due_date or '' }}">
       </label>
       <label>Current total
-        <input value="{{ fmt_money(purchase.grand_total) }}" disabled>
+        <input value="{{ fmt_money(purchase.grand_total) }}" disabled data-document-total-preview>
       </label>
       <label>Status
         <select name="payment_status" required>

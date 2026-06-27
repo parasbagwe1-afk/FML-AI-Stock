@@ -32,6 +32,51 @@ def test_sales_report_displays_money_totals(client, app):
     assert "₹118.00".encode() in response.data
 
 
+def test_monthly_sales_and_purchase_reports(client, app):
+    with app.app_context():
+        data = ids()
+        for number, rate in [("MONTH-SALE-1", "100"), ("MONTH-SALE-2", "200")]:
+            create_sale(
+                {
+                    "company_id": data["ai"].id,
+                    "stock_book_id": data["ai_gst"].id,
+                    "customer_id": data["customer"].id,
+                    "sale_type": "GST",
+                    "invoice_number": number,
+                    "invoice_date": "2026-06-23",
+                },
+                [{"item_id": data["item"].id, "quantity": "1", "rate": rate, "gst_percent": "0"}],
+                admin(),
+            )
+        for number, rate in [("MONTH-PUR-1", "50"), ("MONTH-PUR-2", "150")]:
+            create_purchase(
+                {
+                    "company_id": data["ai"].id,
+                    "stock_book_id": data["ai_gst"].id,
+                    "supplier_id": data["supplier"].id,
+                    "purchase_type": "GST",
+                    "bill_number": number,
+                    "bill_date": "2026-06-24",
+                },
+                [{"item_id": data["item"].id, "quantity": "1", "rate": rate, "gst_percent": "0"}],
+                admin(),
+            )
+        db.session.commit()
+
+    login(client)
+    sales = client.get("/reports/sales-monthly")
+    purchases = client.get("/reports/purchases-monthly")
+
+    assert sales.status_code == 200
+    assert b"Monthly Sales Report" in sales.data
+    assert b"2026-06" in sales.data
+    assert "₹300.00".encode() in sales.data
+    assert purchases.status_code == 200
+    assert b"Monthly Purchase Report" in purchases.data
+    assert b"2026-06" in purchases.data
+    assert "₹200.00".encode() in purchases.data
+
+
 def test_outstanding_customer_search_shows_filtered_balance_summary(client, app):
     with app.app_context():
         data = ids()
@@ -165,6 +210,53 @@ def test_outstanding_customer_detail_shows_bill_dates_and_edit_links(client, app
     assert "Customer Activity" in html
     assert "Sales Done" in html
     assert "DETAIL-CUST-RCPT" in html
+
+
+def test_outstanding_hides_paid_and_zero_balance_documents(client, app):
+    with app.app_context():
+        data = ids()
+        sale = create_sale(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "customer_id": data["customer"].id,
+                "sale_type": "GST",
+                "invoice_number": "PAID-HIDDEN-INV",
+                "invoice_date": "2026-06-23",
+            },
+            [{"item_id": data["item"].id, "quantity": "1", "rate": "100", "gst_percent": "0"}],
+            admin(),
+        )
+        receivable = Receivable.query.filter_by(source_type="SALE", source_id=sale.id).one()
+        create_customer_receipt(
+            {
+                "company_id": data["ai"].id,
+                "customer_id": data["customer"].id,
+                "receivable_id": receivable.id,
+                "payment_date": "2026-06-24",
+                "amount": "100",
+                "mode": "UPI",
+                "reference_number": "PAID-HIDDEN-RCPT",
+            },
+            admin(),
+        )
+        company_id = data["ai"].id
+        customer_id = data["customer"].id
+        db.session.commit()
+
+    login(client)
+    listing = client.get("/finance/outstanding?q=PAID-HIDDEN-INV")
+    listing_html = listing.get_data(as_text=True)
+    listing_tables = listing_html.split('id="outstanding_tables"', 1)[1]
+    detail = client.get(f"/finance/outstanding/customer/{company_id}/{customer_id}")
+    detail_html = detail.get_data(as_text=True)
+    bill_section = detail_html.split('id="customer-activity"', 1)[0]
+
+    assert listing.status_code == 200
+    assert "PAID-HIDDEN-INV" not in listing_tables
+    assert detail.status_code == 200
+    assert "PAID-HIDDEN-INV" not in bill_section
+    assert "No bill details found" in bill_section
 
 
 def test_item_ledger_shows_supplier_debtor_and_running_stock(client, app):
@@ -340,8 +432,8 @@ def test_customer_outstanding_nets_unallocated_advance_against_balance(client, a
     html = response.get_data(as_text=True)
 
     assert response.status_code == 200
-    assert "₹1,22,000.00" in html
-    assert "₹1,00,000.00" in html
+    assert "₹86,000.00" in html
+    assert "₹64,000.00" in html
     assert "₹22,000.00" in html
     assert "Includes ₹14,000.00 advance offset" in html
     assert "Bill balance ₹36,000.00 before advances" in html
@@ -349,7 +441,7 @@ def test_customer_outstanding_nets_unallocated_advance_against_balance(client, a
     report = client.get("/reports/customer-outstanding")
     report_html = report.get_data(as_text=True)
     assert report.status_code == 200
-    assert "₹1,00,000.00" in report_html
+    assert "₹64,000.00" in report_html
     assert "₹22,000.00" in report_html
 
 

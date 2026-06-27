@@ -90,6 +90,7 @@ document.addEventListener("click", async (event) => {
       initializeItemPickers(clone);
       syncTransactionGstFields(add.closest("form"));
       updateLineTotal(clone);
+      updateDocumentTotal(add.closest("form"));
       playTone("add");
       window.setTimeout(() => clone.classList.remove("row-enter"), 220);
     }
@@ -103,7 +104,11 @@ document.addEventListener("click", async (event) => {
       const row = remove.closest(".line-row");
       row.classList.add("row-exit");
       playTone("remove");
-      window.setTimeout(() => row.remove(), 150);
+      window.setTimeout(() => {
+        const form = grid.closest("form");
+        row.remove();
+        updateDocumentTotal(form);
+      }, 150);
     }
   }
 
@@ -195,18 +200,42 @@ function normalizeSearchText(value) {
 
 function updateLineTotal(row) {
   if (!row) return;
-  const quantity = parseFloat(row.querySelector('input[name="quantity[]"]')?.value || "0");
-  const rate = parseFloat(row.querySelector('input[name="rate[]"]')?.value || "0");
-  const gst = isTaxableForm(row.closest("form")) ? parseFloat(row.querySelector('input[name="gst_percent[]"]')?.value || "0") : 0;
   const output = row.querySelector(".line-total-preview");
   if (!output) return;
+  output.textContent = formatPreviewMoney(linePreviewTotal(row));
+  updateDocumentTotal(row.closest("form"));
+}
+
+function linePreviewTotal(row) {
+  const quantity = parseFloat(row.querySelector('input[name="quantity[]"]')?.value || "0");
+  const rate = parseFloat(row.querySelector('input[name="rate[]"]')?.value || "0");
+  const gst = isTaxableForm(row.closest("form"))
+    ? parseFloat(row.querySelector('input[name="gst_percent[]"]')?.value || "0")
+    : 0;
   const subtotal = quantity * rate;
-  output.textContent = formatPreviewMoney(subtotal + subtotal * gst / 100);
+  return subtotal + subtotal * gst / 100;
+}
+
+function updateDocumentTotal(form) {
+  if (!form) return;
+  const preview = form.querySelector("[data-document-total-preview]");
+  if (!preview) return;
+  const total = Array.from(form.querySelectorAll(".line-row")).reduce(
+    (sum, row) => sum + linePreviewTotal(row),
+    0
+  );
+  if ("value" in preview) {
+    preview.value = formatPreviewMoney(total);
+  } else {
+    preview.textContent = formatPreviewMoney(total);
+  }
 }
 
 function transactionType(form) {
   if (!form) return "";
-  const control = form.querySelector('select[name="purchase_type"], select[name="sale_type"], input[name="purchase_type"], input[name="sale_type"]');
+  const control = form.querySelector(
+    'select[name="purchase_type"], select[name="sale_type"], input[name="purchase_type"], input[name="sale_type"]'
+  );
   return (control?.value || form.dataset.transactionType || "").trim().toUpperCase();
 }
 
@@ -229,6 +258,7 @@ function syncTransactionGstFields(form) {
     }
     updateLineTotal(input.closest(".line-row"));
   });
+  updateDocumentTotal(form);
 }
 
 function itemOptionLabel(option) {
@@ -427,7 +457,12 @@ function filterStockBooks(form) {
     : form.querySelector('select[name="sale_type"]')
       ? 'select[name="sale_type"]'
       : null;
-  filterStockBookPair(form, 'select[name="company_id"]', 'select[name="stock_book_id"]', categorySelector);
+  filterStockBookPair(
+    form,
+    'select[name="company_id"], input[name="company_id"]',
+    'select[name="stock_book_id"]',
+    categorySelector
+  );
   filterStockBookPair(form, 'select[name="from_company_id"]', 'select[name="from_stock_book_id"]');
   filterStockBookPair(form, 'select[name="to_company_id"]', 'select[name="to_stock_book_id"]');
 }
@@ -443,6 +478,7 @@ document.addEventListener("change", (event) => {
     const form = event.target.closest("form");
     filterStockBooks(form);
     syncTransactionGstFields(form);
+    updateDocumentTotal(form);
   }
 });
 
@@ -473,6 +509,7 @@ document.addEventListener("change", (event) => {
 document.querySelectorAll("form").forEach(filterStockBooks);
 document.querySelectorAll("form").forEach(syncTransactionGstFields);
 document.querySelectorAll(".line-row").forEach(updateLineTotal);
+document.querySelectorAll("form").forEach(updateDocumentTotal);
 initializeItemPickers();
 document.querySelectorAll("[data-live-search]").forEach(applyLiveSearch);
 

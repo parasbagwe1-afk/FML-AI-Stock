@@ -72,6 +72,7 @@ def payable_edit_url(payable):
 def receivable_detail_rows(company_id, customer_id):
     rows = (
         Receivable.query.filter_by(company_id=company_id, customer_id=customer_id)
+        .filter(Receivable.balance_amount > 0)
         .order_by(Receivable.document_date, Receivable.document_number, Receivable.id)
         .all()
     )
@@ -96,6 +97,7 @@ def receivable_detail_rows(company_id, customer_id):
 def payable_detail_rows(company_id, supplier_id):
     rows = (
         Payable.query.filter_by(company_id=company_id, supplier_id=supplier_id)
+        .filter(Payable.balance_amount > 0)
         .order_by(Payable.document_date, Payable.document_number, Payable.id)
         .all()
     )
@@ -278,8 +280,8 @@ def outstanding():
     company_id = company.id if company else request.args.get("company_id")
     status = request.args.get("status")
     search = (request.args.get("q") or "").strip()
-    receivables = Receivable.query
-    payables = Payable.query
+    receivables = Receivable.query.filter(Receivable.balance_amount > 0)
+    payables = Payable.query.filter(Payable.balance_amount > 0)
     if company_id:
         receivables = receivables.filter_by(company_id=company_id)
         payables = payables.filter_by(company_id=company_id)

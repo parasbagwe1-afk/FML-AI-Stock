@@ -20,6 +20,7 @@
       <span class="spacer"></span>
       <span class="muted-copy">Period {{ date_from }} to {{ date_to }}</span>
       <a class="secondary-button" href="{{ url_for('masters.customer_print', customer_id=customer.id, company_id=selected_company_id or '', date_from=date_from, date_to=date_to) }}" target="_blank" rel="noopener">Overall Print</a>
+      <a class="secondary-button" href="{{ url_for('masters.customer_export', customer_id=customer.id, fmt='pdf', company_id=selected_company_id or '', date_from=date_from, date_to=date_to) }}">Overall PDF</a>
       {% if can(current_user, 'customers', 'edit') %}
         <a class="primary-button" href="{{ url_for('masters.edit_record', kind='customers', record_id=customer.id) }}">Edit Customer</a>
       {% endif %}

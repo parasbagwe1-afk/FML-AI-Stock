@@ -66,6 +66,7 @@
                   <a class="table-action" href="{{ url_for('masters.customer_detail', customer_id=customer.id, company_id=selected_company_id or '') }}">Transactions</a>
                   <a class="table-action" href="{{ url_for('masters.customer_detail', customer_id=customer.id, company_id=selected_company_id or '') }}">View Details</a>
                   <a class="table-action" href="{{ url_for('masters.customer_print', customer_id=customer.id, company_id=selected_company_id or '') }}" target="_blank" rel="noopener">Overall Print</a>
+                  <a class="table-action" href="{{ url_for('masters.customer_export', customer_id=customer.id, fmt='pdf', company_id=selected_company_id or '') }}">Overall PDF</a>
                   {% if can(current_user, config.module, 'edit') %}
                     <a class="table-action" href="{{ url_for('masters.edit_record', kind=kind, record_id=customer.id) }}">Edit</a>
                   {% endif %}

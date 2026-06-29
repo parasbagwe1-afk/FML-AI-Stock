@@ -4,11 +4,12 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from app.core.company_context import active_company
-from app.core.formatting import dec, qty
+from app.core.formatting import dec, fmt_money, fmt_qty, qty
 from app.core.periods import period_from_args
 from app.core.security import require_permission
 from app.extensions import db
 from app.models import Company, Customer, Item, Payment, Receivable, Sale, StockBook, Supplier
+from app.reports.exporting import export_table
 from app.services.audit import audit
 from app.services.customer_profile import customer_master_rows, customer_profile, paginate_rows
 from app.services.supplier_profile import supplier_transactions
@@ -179,6 +180,27 @@ def customer_print(customer_id):
     )
 
 
+@bp.route("/customers/<int:customer_id>/export/<fmt>")
+@login_required
+def customer_export(customer_id, fmt):
+    config = config_or_404("customers")
+    require_permission(config["module"], "view")(lambda: None)()
+    selected_company_id = selected_customer_company_id()
+    date_from, date_to = period_from_args(request.args)
+    profile = customer_profile(customer_id, selected_company_id, date_from, date_to)
+    if not profile:
+        abort(404)
+    try:
+        return export_table(
+            f"Customer Overall - {profile['customer'].name}",
+            CUSTOMER_EXPORT_HEADERS,
+            customer_export_rows(profile, date_from, date_to),
+            fmt,
+        )
+    except ValueError:
+        abort(404)
+
+
 @bp.route("/suppliers/<int:supplier_id>/transactions")
 @login_required
 def supplier_transaction_detail(supplier_id):
@@ -345,6 +367,83 @@ def customer_has_transactions(customer_id):
         Payment.query.filter(Payment.customer_id == customer_id).with_entities(Payment.id),
     )
     return any(query.first() for query in checks)
+
+
+CUSTOMER_EXPORT_HEADERS = ["Section", "Date / Field", "Document", "Type", "Total / Debit", "Paid / Credit", "Balance / Status", "Details"]
+
+
+def customer_export_rows(profile, date_from, date_to):
+    customer = profile["customer"]
+    summary = profile["summary"]
+    companies = ", ".join(company.code for company in profile["companies"]) or "All"
+    rows = [
+        ["Summary", "Period", "", "", date_from, date_to, "", f"Companies: {companies}"],
+        ["Summary", "Total Sales", "", "", fmt_money(summary["total_sales"]), "", "", f"{summary['total_invoices']} invoice(s)"],
+        ["Summary", "Received", "", "", fmt_money(summary["total_received"]), "", "", f"Last payment: {summary['last_payment'] or '-'}"],
+        ["Summary", "Pending Payment", "", "", fmt_money(summary["total_pending"]), "", "", f"Last transaction: {summary['last_transaction'] or '-'}"],
+        ["Summary", "Pending Stock", "", "", fmt_qty(summary["pending_stock"]), "", "", ""],
+        ["Customer", "Code", "", "", customer.code, "", "", ""],
+        ["Customer", "Name", "", "", customer.name, "", "", ""],
+        ["Customer", "Contact", "", "", customer.contact_person or "", customer.mobile or "", customer.whatsapp or "", ""],
+        ["Customer", "Email / GST", "", "", customer.email or "", customer.gst_number or "", "", ""],
+        ["Customer", "City / State", "", "", customer.city or "", customer.state or "", "", customer.address or ""],
+        ["Customer", "Notes", "", "", customer.notes or "", "", "", ""],
+    ]
+    for sale in profile["invoices"]:
+        rows.append(
+            [
+                "Invoice",
+                sale.invoice_date,
+                sale.invoice_number,
+                sale.sale_type,
+                fmt_money(sale.grand_total),
+                fmt_money(sale.paid_amount),
+                f"{fmt_money(sale.balance_amount)} / {sale.payment_status}",
+                sale.remarks or "",
+            ]
+        )
+    for receivable in profile["receivables"]:
+        rows.append(
+            [
+                "Outstanding",
+                receivable.document_date,
+                receivable.document_number,
+                receivable.source_type,
+                fmt_money(receivable.total_amount),
+                fmt_money(receivable.paid_amount),
+                f"{fmt_money(receivable.balance_amount)} / {receivable.payment_status}",
+                f"Due: {receivable.due_date or ''}",
+            ]
+        )
+    for stock_row in profile["stock_rows"]:
+        rows.append(
+            [
+                "Stock / Challan",
+                stock_row["challan_date"],
+                stock_row["challan_number"],
+                stock_row["item"],
+                fmt_qty(stock_row["quantity"]),
+                "",
+                stock_row["status"],
+                stock_row["weight"],
+            ]
+        )
+    for payment in profile["payments"]:
+        rows.append(
+            [
+                "Payment",
+                payment.payment_date,
+                payment.reference_number or "",
+                payment.mode,
+                fmt_money(payment.total_amount),
+                fmt_money(payment.allocated_amount),
+                fmt_money(payment.unallocated_amount),
+                payment.remarks or "",
+            ]
+        )
+    for document in profile["documents"]:
+        rows.append(["Document", document["date"], document["label"], document["type"], "", "", "", ""])
+    return rows
 
 
 def friendly_integrity_error(kind, exc):

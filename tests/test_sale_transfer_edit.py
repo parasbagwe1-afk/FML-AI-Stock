@@ -500,6 +500,11 @@ def test_company_user_sees_edit_for_existing_sale(client, app):
     view_html = view_response.get_data(as_text=True)
     assert view_response.status_code == 200
     assert "SALES-EDIT-INV" in view_html
+    assert "Tax Invoice" in view_html
+    assert "Buyer (Bill to)" in view_html
+    assert "Description of Goods" in view_html
+    assert "Amount Chargeable (in words)" in view_html
+    assert "This is a Computer Generated Invoice" in view_html
     assert "window.setTimeout(() => window.print()" not in view_html
 
 

@@ -527,7 +527,10 @@ def test_customer_outstanding_report_groups_customer_once_per_company(client, ap
 
     assert response.status_code == 200
     assert html.count(customer_name) == 1
-    assert "2 documents" in html
+    assert "Documents" not in html
+    assert "First date" not in html
+    assert "Next due" not in html
+    assert "Status" not in html
     assert "₹354.00" in html
 
 

@@ -32,6 +32,7 @@ from app.services.entry_exports import (
     payment_rows,
     print_entry,
 )
+from app.services.sale_invoice import export_sale_invoice_pdf, sale_invoice_context
 from app.services.transactions import (
     create_opening_advance_paid,
     create_opening_advance_received,
@@ -290,6 +291,8 @@ def sale_export(sale_id, fmt):
     if not sale:
         abort(404)
     require_active_company_document(sale.company_id)
+    if (fmt or "").lower() == "pdf":
+        return export_sale_invoice_pdf(sale)
     return export_response(sale_rows(sale), fmt)
 
 
@@ -301,8 +304,7 @@ def sale_view(sale_id):
     if not sale:
         abort(404)
     require_active_company_document(sale.company_id)
-    title, rows = sale_rows(sale)
-    return print_entry(title, rows, auto_print=False)
+    return render_template("transactions/sale_invoice.html", **sale_invoice_context(sale, auto_print=False))
 
 
 @bp.route("/sale/<int:sale_id>/print")
@@ -313,7 +315,7 @@ def sale_print(sale_id):
     if not sale:
         abort(404)
     require_active_company_document(sale.company_id)
-    return print_response(sale_rows(sale))
+    return render_template("transactions/sale_invoice.html", **sale_invoice_context(sale, auto_print=True))
 
 
 @bp.route("/transfer", methods=["GET", "POST"])

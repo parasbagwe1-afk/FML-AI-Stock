@@ -4,6 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}{{ active_company.name if active_company else 'Company Login' }}{% endblock %}</title>
+    <script>
+      (() => {
+        const theme = localStorage.getItem("fastockflow-theme");
+        if (theme === "dark") document.documentElement.dataset.theme = "dark";
+      })();
+    </script>
     <link rel="icon" href="{{ url_for('static', filename=company_logo(active_company) if active_company else 'img/fastockflow-icon.png', v=asset_version) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=asset_version) }}">
   </head>
@@ -11,6 +17,9 @@
     {% if current_user.is_authenticated %}
       <div class="app-shell">
         <aside class="sidebar">
+          <button class="sidebar-collapse-button" type="button" data-sidebar-toggle aria-label="Collapse sidebar" title="Collapse sidebar">
+            <span data-icon="panel-left"></span>
+          </button>
           <a class="brand" href="{{ url_for('dashboard.index') }}">
             <span class="brand-mark logo-mark company-brand-mark"><img src="{{ url_for('static', filename=company_logo(active_company), v=asset_version) }}" alt="{{ active_company.name if active_company else active_company_theme.app_name }}"></span>
             <span>
@@ -20,28 +29,29 @@
           </a>
           <nav class="nav">
             {% set nav = [
-              ('dashboard.index','dashboard','Dashboard'),
-              ('masters.list_records','items','Items', {'kind':'items'}),
-              ('masters.list_records','customers','Customers', {'kind':'customers'}),
-              ('masters.list_records','suppliers','Suppliers', {'kind':'suppliers'}),
-              ('transactions.purchase','purchase','Purchase'),
-              ('transactions.sale','sale','Sale'),
-              ('transactions.transfer','transfer','Transfer'),
-              ('transactions.opening','opening','Opening'),
-              ('payments.index','payments','Payments'),
-              ('payments.outstanding','outstanding','Outstanding'),
-              ('reports.show','stock','Stock', {'name':'current-stock'}),
-              ('reports.show','inter_company','Inter Co', {'name':'inter-company'}),
-              ('reports.index','reports','Reports'),
-              ('users.index','users','Users')
+              ('dashboard.index','dashboard','Dashboard', {}, 'layout-dashboard'),
+              ('masters.list_records','items','Items', {'kind':'items'}, 'gem'),
+              ('masters.list_records','customers','Customers', {'kind':'customers'}, 'users'),
+              ('masters.list_records','suppliers','Suppliers', {'kind':'suppliers'}, 'truck'),
+              ('transactions.purchase','purchase','Purchase', {}, 'shopping-bag'),
+              ('transactions.sale','sale','Sale', {}, 'receipt-text'),
+              ('transactions.transfer','transfer','Transfer', {}, 'arrow-left-right'),
+              ('transactions.opening','opening','Opening', {}, 'folder-open'),
+              ('payments.index','payments','Payments', {}, 'credit-card'),
+              ('payments.outstanding','outstanding','Outstanding', {}, 'wallet-cards'),
+              ('reports.show','stock','Stock', {'name':'current-stock'}, 'boxes'),
+              ('reports.show','inter_company','Inter Co', {'name':'inter-company'}, 'building-2'),
+              ('reports.index','reports','Reports', {}, 'chart-no-axes-combined'),
+              ('users.index','users','Users', {}, 'user-cog')
             ] %}
             {% for item in nav %}
               {% set endpoint = item[0] %}
               {% set module = item[1] %}
               {% set label = item[2] %}
               {% set params = item[3] if item|length > 3 else {} %}
+              {% set icon = item[4] if item|length > 4 else 'circle' %}
               {% if can(current_user, module, 'view') %}
-                <a href="{{ url_for(endpoint, **params) }}" class="{% if is_active_nav(endpoint, params) %}active{% endif %}">{{ label }}</a>
+                <a data-nav-icon="{{ icon }}" href="{{ url_for(endpoint, **params) }}" class="{% if is_active_nav(endpoint, params) %}active{% endif %}">{{ label }}</a>
               {% endif %}
             {% endfor %}
           </nav>
@@ -71,11 +81,15 @@
         </aside>
         <main class="main">
           <header class="topbar">
-            <div>
+            <div class="topbar-copy">
               <h1>{% block page_title %}FAstockFlow{% endblock %}</h1>
               <p>{% block page_subtitle %}Real-time stock, FIFO, payments and inter-company control{% endblock %}</p>
             </div>
             <div class="topbar-actions">
+              <label class="global-search" aria-label="Search current page">
+                <span data-icon="search"></span>
+                <input type="search" placeholder="Search this page" data-global-search autocomplete="off">
+              </label>
               {% if active_company %}
                 <div class="company-chip">
                   <img src="{{ url_for('static', filename=company_logo(active_company), v=asset_version) }}" alt="">
@@ -96,6 +110,9 @@
                   {% if due_alert_count > 0 %}<span class="alert-badge">{{ due_alert_count }}</span>{% endif %}
                 </a>
               {% endif %}
+              <button class="theme-toggle" type="button" data-theme-toggle aria-label="Toggle dark mode" title="Toggle dark mode">
+                <span data-icon="moon"></span>
+              </button>
               <div class="user-chip">{{ current_user.name }} · {{ current_user.role }}</div>
             </div>
           </header>

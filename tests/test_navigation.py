@@ -249,14 +249,17 @@ def test_sidebar_company_names_switch_company_context(client):
     assert 'FirstTech Machine LLP</button>' not in html
 
 
-def test_topbar_omits_background_music_controls(client):
+def test_focus_mode_controls_live_outside_topbar(client):
     login(client)
     response = client.get("/dashboard/")
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert 'data-music-toggle' not in html
-    assert 'data-music-volume' not in html
-    assert 'aria-label="Background music volume"' not in html
+    topbar_html = html.split('<header class="topbar">', 1)[1].split("</header>", 1)[0]
+    assert 'data-music-toggle' not in topbar_html
+    assert 'data-music-volume' not in topbar_html
+    assert 'data-tool-toggle="music"' in html
+    assert 'data-music-toggle' in html
+    assert 'data-music-volume' in html
     assert 'aria-label="Due alerts"' in html
 
 

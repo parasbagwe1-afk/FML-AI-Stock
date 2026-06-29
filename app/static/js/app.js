@@ -153,6 +153,463 @@ document.addEventListener("click", async (event) => {
   }
 });
 
+const APP_ICON_PATHS = {
+  "arrow-left-right": '<path d="M8 7h13"/><path d="m18 4 3 3-3 3"/><path d="M16 17H3"/><path d="m6 20-3-3 3-3"/>',
+  "boxes": '<path d="M2.97 12.92 12 18.14l9.03-5.22"/><path d="M2.97 7.08 12 12.3l9.03-5.22"/><path d="M12 2 2.97 7.08 12 12.3l9.03-5.22L12 2Z"/><path d="M12 12.3v9.7"/>',
+  "building-2": '<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18"/><path d="M6 12H4a2 2 0 0 0-2 2v8"/><path d="M18 9h2a2 2 0 0 1 2 2v11"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/>',
+  "chart-no-axes-combined": '<path d="M12 16v5"/><path d="M16 14v7"/><path d="M20 10v11"/><path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.708 0L2 15"/><path d="M4 18v3"/><path d="M8 14v7"/>',
+  "circle": '<circle cx="12" cy="12" r="9"/>',
+  "credit-card": '<rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/>',
+  "folder-open": '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6A2 2 0 0 1 18.46 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4.9a2 2 0 0 1 1.69.93l1.15 1.82H20a2 2 0 0 1 2 2v2"/>',
+  "gem": '<path d="M6 3h12l4 6-10 12L2 9l4-6Z"/><path d="M11 3 8 9l4 12 4-12-3-6"/><path d="M2 9h20"/>',
+  "layout-dashboard": '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
+  "moon": '<path d="M12 3a6 6 0 0 0 9 7.2A9 9 0 1 1 12 3Z"/>',
+  "panel-left": '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
+  "pause": '<rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/>',
+  "play": '<path d="m6 3 15 9-15 9V3Z"/>',
+  "receipt-text": '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h5"/>',
+  "repeat": '<path d="m17 2 4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+  "search": '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  "shopping-bag": '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+  "skip-back": '<path d="M19 20 9 12l10-8v16Z"/><path d="M5 19V5"/>',
+  "skip-forward": '<path d="m5 4 10 8-10 8V4Z"/><path d="M19 5v14"/>',
+  "truck": '<path d="M14 18V6a2 2 0 0 0-2-2H3v14h2"/><path d="M15 18H9"/><path d="M19 18h2v-6l-3-5h-4"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+  "user-cog": '<circle cx="18" cy="15" r="3"/><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h5"/><path d="m21.7 16.4-.9-.3"/><path d="m15.2 13.9-.9-.3"/><path d="m16.6 18.7.3-.9"/><path d="m19.1 12.2.3-.9"/><path d="m19.6 18.7-.4-.9"/><path d="m16.8 12.2-.4-.9"/>',
+  "users": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  "volume-2": '<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>',
+  "volume-x": '<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/>',
+  "wallet-cards": '<rect width="18" height="14" x="3" y="5" rx="2"/><path d="M3 10h18"/><path d="M7 15h.01"/><path d="M11 15h2"/>',
+};
+
+function iconSvg(name) {
+  const paths = APP_ICON_PATHS[name] || APP_ICON_PATHS.circle;
+  const span = document.createElement("span");
+  span.className = "app-icon";
+  span.setAttribute("aria-hidden", "true");
+  span.innerHTML = `<svg viewBox="0 0 24 24">${paths}</svg>`;
+  return span;
+}
+
+function renderAppIcons(root = document) {
+  const iconTargets = [];
+  if (root.matches?.("[data-icon]")) iconTargets.push(root);
+  iconTargets.push(...Array.from(root.querySelectorAll?.("[data-icon]") || []));
+  iconTargets.forEach((target) => {
+    if (target.dataset.iconReady === "true") return;
+    target.textContent = "";
+    target.appendChild(iconSvg(target.dataset.icon));
+    target.dataset.iconReady = "true";
+  });
+  root.querySelectorAll(".nav a[data-nav-icon]").forEach((link) => {
+    if (link.dataset.iconReady === "true") return;
+    link.prepend(iconSvg(link.dataset.navIcon));
+    link.dataset.iconReady = "true";
+  });
+}
+
+function initializeThemeControls() {
+  const toggle = document.querySelector("[data-theme-toggle]");
+  const saved = localStorage.getItem("fastockflow-theme");
+  if (saved === "dark") document.documentElement.dataset.theme = "dark";
+  updateThemeToggle(toggle);
+  toggle?.addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    if (next === "dark") {
+      document.documentElement.dataset.theme = "dark";
+      localStorage.setItem("fastockflow-theme", "dark");
+    } else {
+      delete document.documentElement.dataset.theme;
+      localStorage.setItem("fastockflow-theme", "light");
+    }
+    updateThemeToggle(toggle);
+  });
+}
+
+function updateThemeToggle(toggle) {
+  if (!toggle) return;
+  const dark = document.documentElement.dataset.theme === "dark";
+  toggle.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+  const holder = toggle.querySelector("[data-icon]");
+  if (holder) {
+    holder.dataset.icon = dark ? "sun" : "moon";
+    holder.dataset.iconReady = "false";
+    renderAppIcons(holder);
+  }
+}
+
+APP_ICON_PATHS.sun = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>';
+
+function initializeSidebarControls() {
+  const collapsed = localStorage.getItem("fastockflow-sidebar") === "collapsed";
+  document.body.classList.toggle("sidebar-collapsed", collapsed);
+  const toggle = document.querySelector("[data-sidebar-toggle]");
+  if (!toggle) return;
+  toggle.setAttribute("aria-expanded", String(!collapsed));
+  toggle.addEventListener("click", () => {
+    const next = !document.body.classList.contains("sidebar-collapsed");
+    document.body.classList.toggle("sidebar-collapsed", next);
+    localStorage.setItem("fastockflow-sidebar", next ? "collapsed" : "expanded");
+    toggle.setAttribute("aria-expanded", String(!next));
+  });
+}
+
+function initializeScrollShadow() {
+  const update = () => document.body.classList.toggle("has-scrolled", window.scrollY > 8);
+  update();
+  window.addEventListener("scroll", update, { passive: true });
+}
+
+function initializeGlobalSearch() {
+  const input = document.querySelector("[data-global-search]");
+  if (!input) return;
+  input.addEventListener("input", () => {
+    const query = normalizeSearchText(input.value);
+    document.querySelectorAll("main .panel, main .metric-card, main .report-card, main .hero-panel").forEach((section) => {
+      if (section.closest(".topbar")) return;
+      const visible = !query || normalizeSearchText(section.textContent).includes(query);
+      section.classList.toggle("is-search-hidden", !visible);
+    });
+    document.querySelectorAll("main table tbody tr").forEach((row) => {
+      if (row.matches("[data-live-empty], .empty")) return;
+      row.hidden = Boolean(query) && !normalizeSearchText(row.textContent).includes(query);
+    });
+    updateReportTotals();
+    updateOutstandingSummary();
+  });
+}
+
+function initializeDashboardVisuals() {
+  document.querySelectorAll("[data-auto-bars]").forEach((group) => {
+    const rows = Array.from(group.querySelectorAll("[data-bar-value]"));
+    const values = rows.map((row) => Math.abs(parseMoneyText(row.dataset.barValue)));
+    const max = Math.max(1, ...values);
+    rows.forEach((row) => {
+      const value = Math.abs(parseMoneyText(row.dataset.barValue));
+      row.style.setProperty("--bar-width", `${Math.max(4, Math.round((value / max) * 100))}%`);
+    });
+  });
+  document.querySelectorAll("[data-split-chart]").forEach((chart) => {
+    const segments = Array.from(chart.querySelectorAll("[data-split-segment]"));
+    const values = segments.map((segment) => Math.max(0, parseMoneyText(segment.dataset.splitValue)));
+    const total = values.reduce((sum, value) => sum + value, 0) || 1;
+    segments.forEach((segment, index) => {
+      segment.style.setProperty("--split-width", `${Math.max(6, (values[index] / total) * 100)}%`);
+    });
+  });
+}
+
+function initializeCounters() {
+  const targets = Array.from(document.querySelectorAll("[data-count-value]"));
+  const animate = (target) => {
+    if (target.dataset.countDone === "true") return;
+    target.dataset.countDone = "true";
+    const raw = target.textContent.trim();
+    const end = Number.parseFloat(raw.replace(/,/g, ""));
+    if (!Number.isFinite(end)) return;
+    const duration = 620;
+    const startTime = performance.now();
+    const decimals = raw.includes(".") ? Math.min(3, (raw.split(".")[1] || "").length) : 0;
+    const step = (now) => {
+      const progress = Math.min(1, (now - startTime) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const value = end * eased;
+      target.textContent = decimals ? value.toFixed(decimals).replace(/\.?0+$/, "") : String(Math.round(value));
+      if (progress < 1) requestAnimationFrame(step);
+      else target.textContent = raw;
+    };
+    requestAnimationFrame(step);
+  };
+  if (!("IntersectionObserver" in window)) {
+    targets.forEach(animate);
+    return;
+  }
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        animate(entry.target);
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.4 });
+  targets.forEach((target) => observer.observe(target));
+}
+
+function initializeRipples() {
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest(".primary-button, .secondary-button, .icon-button, .table-action, .floating-tool-button, .music-controls button");
+    if (!button || button.classList.contains("link-button")) return;
+    const rect = button.getBoundingClientRect();
+    const ripple = document.createElement("span");
+    const size = Math.max(rect.width, rect.height) * 1.8;
+    ripple.className = "button-ripple";
+    ripple.style.width = `${size}px`;
+    ripple.style.height = `${size}px`;
+    ripple.style.left = `${event.clientX - rect.left}px`;
+    ripple.style.top = `${event.clientY - rect.top}px`;
+    button.appendChild(ripple);
+    window.setTimeout(() => ripple.remove(), 560);
+  });
+}
+
+const focusModeState = {
+  initialized: false,
+  playing: false,
+  muted: false,
+  loop: false,
+  track: "rain",
+  volume: 0.45,
+  gain: null,
+  nodes: [],
+  timers: [],
+};
+
+const FOCUS_TRACKS = ["rain", "ocean", "piano", "forest", "coffee", "lofi"];
+const FOCUS_TRACK_NAMES = {
+  rain: "Rain",
+  ocean: "Ocean Waves",
+  piano: "Soft Piano",
+  forest: "Forest",
+  coffee: "Coffee Shop",
+  lofi: "Lo-fi Instrumental",
+};
+
+function initializeFocusMode(panel) {
+  if (!panel || panel.dataset.focusReady === "true") return;
+  panel.dataset.focusReady = "true";
+  const saved = JSON.parse(localStorage.getItem("fastockflow-focus-mode") || "{}");
+  focusModeState.track = saved.track || "rain";
+  focusModeState.volume = Number.isFinite(saved.volume) ? saved.volume : Number(saved.volume || 0.45);
+  focusModeState.muted = Boolean(saved.muted);
+  focusModeState.loop = Boolean(saved.loop);
+
+  const track = panel.querySelector("[data-music-track]");
+  const volume = panel.querySelector("[data-music-volume]");
+  if (track) track.value = focusModeState.track;
+  if (volume) volume.value = String(Math.round(focusModeState.volume * 100));
+  panel.querySelector("[data-music-loop]")?.classList.toggle("is-active", focusModeState.loop);
+  updateFocusModeUi(panel);
+}
+
+function saveFocusModePrefs() {
+  localStorage.setItem("fastockflow-focus-mode", JSON.stringify({
+    track: focusModeState.track,
+    volume: focusModeState.volume,
+    muted: focusModeState.muted,
+    loop: focusModeState.loop,
+  }));
+}
+
+function updateFocusModeUi(panel = document.querySelector("[data-tool-panel='music']")) {
+  if (!panel) return;
+  panel.classList.toggle("is-playing", focusModeState.playing);
+  const name = panel.querySelector("[data-music-track-name]");
+  const status = panel.querySelector("[data-music-status]");
+  const toggle = panel.querySelector("[data-music-toggle]");
+  const mute = panel.querySelector("[data-music-mute]");
+  if (name) name.textContent = FOCUS_TRACK_NAMES[focusModeState.track] || "Focus";
+  if (status) status.textContent = focusModeState.playing ? "Playing softly" : "Ready when you are";
+  toggle?.classList.toggle("is-playing", focusModeState.playing);
+  mute?.classList.toggle("is-active", focusModeState.muted);
+  const toggleIcon = toggle?.querySelector("[data-icon]");
+  if (toggleIcon) {
+    toggleIcon.dataset.icon = focusModeState.playing ? "pause" : "play";
+    toggleIcon.dataset.iconReady = "false";
+  }
+  const muteIcon = mute?.querySelector("[data-icon]");
+  if (muteIcon) {
+    muteIcon.dataset.icon = focusModeState.muted ? "volume-x" : "volume-2";
+    muteIcon.dataset.iconReady = "false";
+  }
+  renderAppIcons(panel);
+}
+
+async function startFocusMode() {
+  const context = await getAudioContext();
+  if (!context) return;
+  stopFocusMode(false);
+  focusModeState.gain = context.createGain();
+  focusModeState.gain.gain.value = focusModeState.muted ? 0 : focusModeState.volume;
+  focusModeState.gain.connect(context.destination);
+  buildFocusTrack(context, focusModeState.track);
+  focusModeState.playing = true;
+  updateFocusModeUi();
+}
+
+function stopFocusMode(update = true) {
+  focusModeState.timers.forEach((timer) => window.clearInterval(timer));
+  focusModeState.timers = [];
+  focusModeState.nodes.forEach((node) => {
+    try {
+      if (typeof node.stop === "function") node.stop();
+      if (typeof node.disconnect === "function") node.disconnect();
+    } catch (_) {
+      // Node may already be stopped.
+    }
+  });
+  focusModeState.nodes = [];
+  try {
+    focusModeState.gain?.disconnect();
+  } catch (_) {
+    // Gain may already be disconnected.
+  }
+  focusModeState.gain = null;
+  focusModeState.playing = false;
+  if (update) updateFocusModeUi();
+}
+
+function connectFocusNode(node) {
+  node.connect(focusModeState.gain);
+  focusModeState.nodes.push(node);
+  return node;
+}
+
+function makeNoiseBuffer(context, seconds = 2, intensity = 1) {
+  const buffer = context.createBuffer(1, context.sampleRate * seconds, context.sampleRate);
+  const data = buffer.getChannelData(0);
+  let last = 0;
+  for (let index = 0; index < data.length; index += 1) {
+    last = (last + (Math.random() * 2 - 1) * intensity) / 2;
+    data[index] = last;
+  }
+  return buffer;
+}
+
+function addNoise(context, filterFrequency, gainValue, type = "lowpass") {
+  const source = context.createBufferSource();
+  source.buffer = makeNoiseBuffer(context, 3);
+  source.loop = true;
+  const filter = context.createBiquadFilter();
+  filter.type = type;
+  filter.frequency.value = filterFrequency;
+  const gain = context.createGain();
+  gain.gain.value = gainValue;
+  source.connect(filter);
+  filter.connect(gain);
+  connectFocusNode(gain);
+  focusModeState.nodes.push(source, filter);
+  source.start();
+}
+
+function addDrone(context, frequency, gainValue, type = "sine") {
+  const oscillator = context.createOscillator();
+  oscillator.type = type;
+  oscillator.frequency.value = frequency;
+  const gain = context.createGain();
+  gain.gain.value = gainValue;
+  oscillator.connect(gain);
+  connectFocusNode(gain);
+  focusModeState.nodes.push(oscillator);
+  oscillator.start();
+}
+
+function addPluck(context, frequency, delay = 0) {
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = "sine";
+  oscillator.frequency.value = frequency;
+  const start = context.currentTime + delay;
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(0.06, start + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + 1.7);
+  oscillator.connect(gain);
+  gain.connect(focusModeState.gain);
+  oscillator.start(start);
+  oscillator.stop(start + 1.8);
+  focusModeState.nodes.push(oscillator, gain);
+}
+
+function buildFocusTrack(context, track) {
+  if (track === "rain") {
+    addNoise(context, 1800, 0.18, "bandpass");
+    addNoise(context, 5800, 0.04, "highpass");
+  } else if (track === "ocean") {
+    addNoise(context, 460, 0.16, "lowpass");
+    addDrone(context, 0.08, 0.04, "sine");
+  } else if (track === "piano") {
+    const notes = [261.63, 329.63, 392.0, 493.88, 392.0, 329.63];
+    let step = 0;
+    addNoise(context, 900, 0.018, "lowpass");
+    focusModeState.timers.push(window.setInterval(() => {
+      addPluck(context, notes[step % notes.length]);
+      step += 1;
+    }, 900));
+    addPluck(context, notes[0]);
+  } else if (track === "forest") {
+    addNoise(context, 1200, 0.08, "bandpass");
+    focusModeState.timers.push(window.setInterval(() => {
+      addPluck(context, 880 + Math.random() * 520);
+    }, 1800));
+  } else if (track === "coffee") {
+    addNoise(context, 700, 0.08, "lowpass");
+    focusModeState.timers.push(window.setInterval(() => {
+      addPluck(context, 1200 + Math.random() * 420);
+    }, 2600));
+  } else if (track === "lofi") {
+    addNoise(context, 1200, 0.04, "lowpass");
+    [196, 246.94, 293.66].forEach((freq) => addDrone(context, freq, 0.025, "triangle"));
+  }
+}
+
+document.addEventListener("click", async (event) => {
+  if (event.target.closest("[data-music-toggle]")) {
+    if (focusModeState.playing) stopFocusMode();
+    else await startFocusMode();
+    saveFocusModePrefs();
+    return;
+  }
+  if (event.target.closest("[data-music-prev], [data-music-next]")) {
+    const direction = event.target.closest("[data-music-prev]") ? -1 : 1;
+    const current = FOCUS_TRACKS.indexOf(focusModeState.track);
+    const next = (current + direction + FOCUS_TRACKS.length) % FOCUS_TRACKS.length;
+    focusModeState.track = FOCUS_TRACKS[next];
+    const panel = event.target.closest("[data-tool-panel='music']");
+    const select = panel?.querySelector("[data-music-track]");
+    if (select) select.value = focusModeState.track;
+    if (focusModeState.playing) await startFocusMode();
+    updateFocusModeUi(panel);
+    saveFocusModePrefs();
+    return;
+  }
+  if (event.target.closest("[data-music-mute]")) {
+    focusModeState.muted = !focusModeState.muted;
+    if (focusModeState.gain) focusModeState.gain.gain.value = focusModeState.muted ? 0 : focusModeState.volume;
+    updateFocusModeUi(event.target.closest("[data-tool-panel='music']"));
+    saveFocusModePrefs();
+    return;
+  }
+  if (event.target.closest("[data-music-loop]")) {
+    focusModeState.loop = !focusModeState.loop;
+    event.target.closest("[data-music-loop]").classList.toggle("is-active", focusModeState.loop);
+    saveFocusModePrefs();
+  }
+});
+
+document.addEventListener("input", async (event) => {
+  if (event.target.matches("[data-music-volume]")) {
+    focusModeState.volume = Math.max(0, Math.min(1, Number(event.target.value) / 100));
+    if (focusModeState.gain && !focusModeState.muted) focusModeState.gain.gain.value = focusModeState.volume;
+    saveFocusModePrefs();
+  }
+});
+
+document.addEventListener("change", async (event) => {
+  if (event.target.matches("[data-music-track]")) {
+    focusModeState.track = event.target.value;
+    if (focusModeState.playing) await startFocusMode();
+    updateFocusModeUi(event.target.closest("[data-tool-panel='music']"));
+    saveFocusModePrefs();
+  }
+});
+
+renderAppIcons();
+initializeThemeControls();
+initializeSidebarControls();
+initializeScrollShadow();
+initializeGlobalSearch();
+initializeDashboardVisuals();
+initializeCounters();
+initializeRipples();
+
 document.addEventListener("submit", (event) => {
   const form = event.target;
   if (form.matches("[data-customer-jump-form]")) {
@@ -620,6 +1077,7 @@ function openFloatingTool(name, root = document) {
     button.classList.add("is-active");
     button.setAttribute("aria-expanded", "true");
     if (name === "calendar") initializeCalendar(panel);
+    if (name === "music") initializeFocusMode(panel);
   }
 }
 

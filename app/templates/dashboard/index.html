@@ -15,38 +15,95 @@
 
   <section class="metric-grid">
     {% for card in stock_cards %}
-      <article class="metric-card">
+      <article class="metric-card" data-animate-card>
         <span>{{ card.book.company.code }} · {{ card.book.book_type }}</span>
         <h3>{{ card.book.name }}</h3>
-        <strong>{{ fmt_qty(card.quantity) }}</strong>
+        <strong data-count-value>{{ fmt_qty(card.quantity) }}</strong>
         <small>{{ fmt_money(card.value) }} FIFO value</small>
       </article>
     {% endfor %}
-    <article class="metric-card danger">
+    <article class="metric-card danger" data-animate-card>
       <span>Customer</span>
       <h3>Receivable balance</h3>
       <strong>{{ fmt_money(receivable_total) }}</strong>
       <small>{{ upcoming_count }} due or upcoming</small>
     </article>
-    <article class="metric-card amber">
+    <article class="metric-card amber" data-animate-card>
       <span>Supplier</span>
       <h3>Payable balance</h3>
       <strong>{{ fmt_money(payable_total) }}</strong>
       <small>Supplier and inter-company dues</small>
     </article>
-    <article class="metric-card">
+    <article class="metric-card" data-animate-card>
       <span>Inter-company</span>
       <h3>Pending stock</h3>
-      <strong>{{ fmt_qty(inter_company_pending) }}</strong>
+      <strong data-count-value>{{ fmt_qty(inter_company_pending) }}</strong>
       <small>Issued minus returned quantity</small>
     </article>
-    <article class="metric-card danger">
+    <article class="metric-card danger" data-animate-card>
       <span>Stock alerts</span>
       <h3>Low / out items</h3>
-      <strong>{{ low_stock_count }}</strong>
+      <strong data-count-value>{{ low_stock_count }}</strong>
       <small>Evaluated by book and item</small>
     </article>
   </section>
+
+  <section class="grid two analytics-grid">
+    <div class="panel analytics-panel">
+      <div class="panel-title">
+        <h2>Sales Trend</h2>
+        <a href="{{ url_for('reports.show', name='sales-monthly') }}">Monthly report</a>
+      </div>
+      <div class="dashboard-bars" data-auto-bars>
+        {% for company, book_type, total, profit in sales_summary %}
+          <div class="dashboard-bar-row" data-bar-value="{{ total }}">
+            <span>{{ company }} · {{ book_type }}</span>
+            <div class="dashboard-bar-track"><i></i></div>
+            <strong>{{ fmt_money(total) }}</strong>
+          </div>
+        {% else %}
+          <div class="empty chart-empty">No sales recorded this month.</div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="panel analytics-panel">
+      <div class="panel-title">
+        <h2>Receivable vs Payable</h2>
+        <a href="{{ url_for('payments.outstanding') }}">Outstanding</a>
+      </div>
+      <div class="split-chart" data-split-chart>
+        <div class="split-track">
+          <span data-split-segment data-split-value="{{ receivable_total }}" class="split-receivable"></span>
+          <span data-split-segment data-split-value="{{ payable_total }}" class="split-payable"></span>
+        </div>
+        <div class="split-legend">
+          <span><i class="split-receivable"></i>Receivable {{ fmt_money(receivable_total) }}</span>
+          <span><i class="split-payable"></i>Payable {{ fmt_money(payable_total) }}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {% if stock_cards %}
+    <section class="panel analytics-panel">
+      <div class="panel-title">
+        <h2>Inventory Analytics</h2>
+        <a href="{{ url_for('reports.show', name='current-stock') }}">Stock report</a>
+      </div>
+      <div class="stock-analytics" data-auto-bars>
+        {% for card in stock_cards %}
+          <div class="stock-meter" data-bar-value="{{ card.quantity }}">
+            <div>
+              <strong>{{ card.book.name }}</strong>
+              <small>{{ card.book.company.code }} · {{ card.book.book_type }}</small>
+            </div>
+            <div class="dashboard-bar-track"><i></i></div>
+            <span>{{ fmt_qty(card.quantity) }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
 
   <section class="grid two">
     <div class="panel">

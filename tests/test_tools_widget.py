@@ -13,6 +13,9 @@ def test_floating_tools_render_on_authenticated_pages(client):
     assert response.status_code == 200
     assert 'data-tool-toggle="calculator"' in html
     assert 'data-tool-toggle="calendar"' in html
+    assert 'data-tool-toggle="music"' in html
+    assert 'data-music-toggle' in html
+    assert 'data-music-volume' in html
     assert 'data-calendar-url="/dashboard/calendar-events"' in html
 
 

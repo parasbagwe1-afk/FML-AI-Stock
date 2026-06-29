@@ -2,6 +2,7 @@
   <div class="floating-tool-actions">
     <button type="button" class="floating-tool-button" data-tool-toggle="calculator" aria-controls="floating_calculator" aria-expanded="false">Calc</button>
     <button type="button" class="floating-tool-button" data-tool-toggle="calendar" aria-controls="floating_calendar" aria-expanded="false">Calendar</button>
+    <button type="button" class="floating-tool-button" data-tool-toggle="music" aria-controls="floating_music" aria-expanded="false">Focus</button>
   </div>
 
   <section id="floating_calculator" class="floating-tool-panel calculator-panel" data-tool-panel="calculator" hidden>
@@ -53,5 +54,42 @@
       <strong data-calendar-selected>Events</strong>
       <div data-calendar-events class="calendar-events"></div>
     </div>
+  </section>
+
+  <section id="floating_music" class="floating-tool-panel music-panel" data-tool-panel="music" hidden>
+    <div class="tool-panel-title">
+      <div>
+        <strong>Focus Mode</strong>
+        <small>Manual ambient sound</small>
+      </div>
+      <button type="button" class="tool-close" data-tool-close aria-label="Close focus mode">x</button>
+    </div>
+    <div class="music-now">
+      <span class="music-pulse" aria-hidden="true"></span>
+      <div>
+        <strong data-music-track-name>Rain</strong>
+        <small data-music-status>Ready when you are</small>
+      </div>
+    </div>
+    <label>Track
+      <select data-music-track aria-label="Focus mode track">
+        <option value="rain">Rain</option>
+        <option value="ocean">Ocean Waves</option>
+        <option value="piano">Soft Piano</option>
+        <option value="forest">Forest</option>
+        <option value="coffee">Coffee Shop</option>
+        <option value="lofi">Lo-fi Instrumental</option>
+      </select>
+    </label>
+    <div class="music-controls">
+      <button type="button" data-music-prev aria-label="Previous track"><span data-icon="skip-back"></span></button>
+      <button type="button" class="music-play" data-music-toggle aria-label="Play focus mode"><span data-icon="play"></span></button>
+      <button type="button" data-music-next aria-label="Next track"><span data-icon="skip-forward"></span></button>
+      <button type="button" data-music-mute aria-label="Mute focus mode"><span data-icon="volume-2"></span></button>
+      <button type="button" data-music-loop aria-label="Loop focus mode"><span data-icon="repeat"></span></button>
+    </div>
+    <label>Volume
+      <input type="range" min="0" max="100" value="45" data-music-volume aria-label="Focus mode volume">
+    </label>
   </section>
 </div>

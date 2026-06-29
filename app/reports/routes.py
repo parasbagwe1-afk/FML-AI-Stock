@@ -674,34 +674,50 @@ def created_by_summary(user_ids):
     return "Multiple users"
 
 
-def format_grouped_outstanding_rows(entries, party_kind):
+def format_grouped_outstanding_rows(
+    entries,
+    party_kind,
+    include_documents=True,
+    include_dates=True,
+    include_status=True,
+):
     rows = []
     for group in grouped_party_outstanding(entries, party_kind):
         advance_credit = money(group.get("advance_offset", Decimal("0.00")) + group.get("open_advance", Decimal("0.00")))
-        rows.append([
+        row = [
             group["company"],
             group["party"],
-            group["documents_label"],
-            group["date"],
-            group["due_date"] or "",
             fmt_money(group["total"]),
             fmt_money(group["paid"]),
             fmt_money(advance_credit),
             fmt_money(group["balance"]),
-            group["status"],
             created_by_summary(group["created_by_ids"]),
-        ])
+        ]
+        if include_documents:
+            row.insert(2, group["documents_label"])
+        if include_dates:
+            insert_at = 3 if include_documents else 2
+            row[insert_at:insert_at] = [group["date"], group["due_date"] or ""]
+        if include_status:
+            row.insert(len(row) - 1, group["status"])
+        rows.append(row)
     return rows
 
 
 def customer_outstanding_rows():
-    headers = ["Company", "Customer", "Documents", "First date", "Next due", "Debit bills", "Credit received", "Advance credit", "Closing balance", "Status", "Created by"]
+    headers = ["Company", "Customer", "Debit bills", "Credit received", "Advance credit", "Closing balance", "Created by"]
     query = scope_query_to_active_company(
         Receivable.query.filter(Receivable.balance_amount > 0),
         Receivable.company_id,
     )
     entries = query.order_by(Receivable.due_date, Receivable.document_number).all()
-    return headers, format_grouped_outstanding_rows(entries, "customer")
+    return headers, format_grouped_outstanding_rows(
+        entries,
+        "customer",
+        include_documents=False,
+        include_dates=False,
+        include_status=False,
+    )
 
 
 def supplier_outstanding_rows():

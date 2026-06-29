@@ -133,6 +133,7 @@ def test_transaction_rows_include_pdf_xl_links_and_exports_download(client, app)
 
     downloads = [
         (f"/transactions/purchase/{record_ids['purchase']}/export/pdf", "application/pdf"),
+        (f"/transactions/sale/{record_ids['sale']}/export/pdf", "application/pdf"),
         (
             f"/transactions/sale/{record_ids['sale']}/export/xlsx",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -151,4 +152,7 @@ def test_transaction_rows_include_pdf_xl_links_and_exports_download(client, app)
     print_response = client.get(f"/transactions/sale/{record_ids['sale']}/print")
     assert print_response.status_code == 200
     assert print_response.mimetype == "text/html"
-    assert "EXPORT-INV" in print_response.get_data(as_text=True)
+    print_html = print_response.get_data(as_text=True)
+    assert "EXPORT-INV" in print_html
+    assert "Tax Invoice" in print_html
+    assert "window.setTimeout(() => window.print()" in print_html

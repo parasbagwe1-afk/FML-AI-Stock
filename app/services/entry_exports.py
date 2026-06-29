@@ -14,8 +14,14 @@ def export_entry(title, rows, fmt):
     return export_table(title, HEADERS, rows, fmt)
 
 
-def print_entry(title, rows):
-    return render_template("print/entry.html", title=title, headers=HEADERS, rows=rows)
+def print_entry(title, rows, auto_print=True):
+    return render_template(
+        "print/entry.html",
+        title=title,
+        headers=HEADERS,
+        rows=rows,
+        auto_print=auto_print,
+    )
 
 
 def normalize_export_format(fmt):

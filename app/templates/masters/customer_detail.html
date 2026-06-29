@@ -87,7 +87,7 @@
         <thead><tr><th>Date</th><th>Company</th><th>Invoice</th><th>Type</th><th>Total</th><th>Paid</th><th>Pending</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
           {% for sale in profile.invoices %}
-            <tr><td>{{ sale.invoice_date }}</td><td>{{ sale.company.code }}</td><td>{{ sale.invoice_number }}</td><td>{{ sale.sale_type }}</td><td>{{ fmt_money(sale.grand_total) }}</td><td>{{ fmt_money(sale.paid_amount) }}</td><td>{{ fmt_money(sale.balance_amount) }}</td><td>{{ sale.payment_status }}</td><td class="actions"><a class="table-action" href="{{ url_for('transactions.sale_edit', sale_id=sale.id) }}">Edit</a><a class="table-action" href="{{ url_for('transactions.sale_export', sale_id=sale.id, fmt='pdf') }}">PDF</a><a class="table-action" href="{{ url_for('transactions.sale_print', sale_id=sale.id) }}" target="_blank" rel="noopener">Print</a></td></tr>
+            <tr><td>{{ sale.invoice_date }}</td><td>{{ sale.company.code }}</td><td><a class="customer-link" href="{{ url_for('transactions.sale_view', sale_id=sale.id) }}" target="_blank" rel="noopener">{{ sale.invoice_number }}</a></td><td>{{ sale.sale_type }}</td><td>{{ fmt_money(sale.grand_total) }}</td><td>{{ fmt_money(sale.paid_amount) }}</td><td>{{ fmt_money(sale.balance_amount) }}</td><td>{{ sale.payment_status }}</td><td class="actions"><a class="table-action" href="{{ url_for('transactions.sale_view', sale_id=sale.id) }}" target="_blank" rel="noopener">View</a><a class="table-action" href="{{ url_for('transactions.sale_edit', sale_id=sale.id) }}">Edit</a><a class="table-action" href="{{ url_for('transactions.sale_export', sale_id=sale.id, fmt='pdf') }}">PDF</a><a class="table-action" href="{{ url_for('transactions.sale_print', sale_id=sale.id) }}" target="_blank" rel="noopener">Print</a></td></tr>
           {% else %}
             <tr><td colspan="9" class="empty">No invoices.</td></tr>
           {% endfor %}
@@ -103,7 +103,7 @@
         <thead><tr><th>Challan No.</th><th>Challan Date</th><th>Item</th><th>Quantity</th><th>Weight</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
           {% for row in profile.stock_rows %}
-            <tr><td>{{ row.challan_number }}</td><td>{{ row.challan_date }}</td><td>{{ row.item }}</td><td>{{ fmt_qty(row.quantity) }}</td><td>{{ row.weight }}</td><td>{{ row.status }}</td><td><a class="table-action" href="{{ url_for('transactions.sale_export', sale_id=row.sale.id, fmt='pdf') }}">PDF</a><a class="table-action" href="{{ url_for('transactions.sale_print', sale_id=row.sale.id) }}" target="_blank" rel="noopener">Print</a></td></tr>
+            <tr><td><a class="customer-link" href="{{ url_for('transactions.sale_view', sale_id=row.sale.id) }}" target="_blank" rel="noopener">{{ row.challan_number }}</a></td><td>{{ row.challan_date }}</td><td>{{ row.item }}</td><td>{{ fmt_qty(row.quantity) }}</td><td>{{ row.weight }}</td><td>{{ row.status }}</td><td><a class="table-action" href="{{ url_for('transactions.sale_view', sale_id=row.sale.id) }}" target="_blank" rel="noopener">View</a><a class="table-action" href="{{ url_for('transactions.sale_export', sale_id=row.sale.id, fmt='pdf') }}">PDF</a><a class="table-action" href="{{ url_for('transactions.sale_print', sale_id=row.sale.id) }}" target="_blank" rel="noopener">Print</a></td></tr>
           {% else %}
             <tr><td colspan="7" class="empty">No challan rows.</td></tr>
           {% endfor %}
@@ -144,7 +144,7 @@
         <thead><tr><th>Date</th><th>Type</th><th>Document</th><th>Actions</th></tr></thead>
         <tbody>
           {% for document in profile.documents %}
-            <tr><td>{{ document.date }}</td><td>{{ document.type }}</td><td>{{ document.label }}</td><td><a class="table-action" href="{{ url_for('transactions.sale_export', sale_id=document.sale.id, fmt='pdf') }}">Open PDF</a><a class="table-action" href="{{ url_for('transactions.sale_print', sale_id=document.sale.id) }}" target="_blank" rel="noopener">Print</a></td></tr>
+            <tr><td>{{ document.date }}</td><td>{{ document.type }}</td><td><a class="customer-link" href="{{ url_for('transactions.sale_view', sale_id=document.sale.id) }}" target="_blank" rel="noopener">{{ document.label }}</a></td><td><a class="table-action" href="{{ url_for('transactions.sale_view', sale_id=document.sale.id) }}" target="_blank" rel="noopener">View</a><a class="table-action" href="{{ url_for('transactions.sale_export', sale_id=document.sale.id, fmt='pdf') }}">Open PDF</a><a class="table-action" href="{{ url_for('transactions.sale_print', sale_id=document.sale.id) }}" target="_blank" rel="noopener">Print</a></td></tr>
           {% else %}
             <tr><td colspan="4" class="empty">No generated documents.</td></tr>
           {% endfor %}

@@ -38,8 +38,10 @@
       {% endfor %}
     </tbody>
   </table>
-  <script>
-    window.addEventListener("load", () => window.setTimeout(() => window.print(), 250));
-  </script>
+  {% if auto_print %}
+    <script>
+      window.addEventListener("load", () => window.setTimeout(() => window.print(), 250));
+    </script>
+  {% endif %}
 </body>
 </html>

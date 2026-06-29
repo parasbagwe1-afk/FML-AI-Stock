@@ -293,6 +293,18 @@ def sale_export(sale_id, fmt):
     return export_response(sale_rows(sale), fmt)
 
 
+@bp.route("/sale/<int:sale_id>/view")
+@login_required
+@require_permission("sale", "view")
+def sale_view(sale_id):
+    sale = db.session.get(Sale, sale_id)
+    if not sale:
+        abort(404)
+    require_active_company_document(sale.company_id)
+    title, rows = sale_rows(sale)
+    return print_entry(title, rows, auto_print=False)
+
+
 @bp.route("/sale/<int:sale_id>/print")
 @login_required
 @require_permission("sale", "view")

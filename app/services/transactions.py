@@ -1106,8 +1106,6 @@ def update_sale_header(sale, data, user):
     if sale.paid_amount and sale.customer_id != customer.id:
         raise ValueError("Customer cannot be changed after receipt allocation.")
     category_changed = sale.stock_book_id != stock_book.id or sale.sale_type != sale_type
-    if sale.paid_amount and category_changed:
-        raise ValueError("Sale type or stock book cannot be changed after receipt allocation.")
 
     before = {
         "customer_id": sale.customer_id,
@@ -1203,8 +1201,16 @@ def update_sale_lines(sale, lines, user):
         gst_percent = _line_gst_percent(row, item, taxable)
         parsed_new.append((item, quantity, sale_rate, gst_percent))
 
-    if changed and sale.paid_amount:
-        raise ValueError("Sale items cannot be changed after receipt allocation.")
+    paid_amount = money(sale.paid_amount or Decimal("0.00"))
+    corrected_total = Decimal("0.00")
+    for _line, _item, quantity, sale_rate, gst_percent in parsed:
+        _subtotal, _gst_amount, line_total = _line_total(quantity, sale_rate, gst_percent, taxable)
+        corrected_total = money(corrected_total + line_total)
+    for _item, quantity, sale_rate, gst_percent in parsed_new:
+        _subtotal, _gst_amount, line_total = _line_total(quantity, sale_rate, gst_percent, taxable)
+        corrected_total = money(corrected_total + line_total)
+    if paid_amount > corrected_total:
+        raise ValueError("Sale total cannot be less than the amount already received. Edit or delete the receipt first.")
     if not changed:
         return sale
 
@@ -1282,9 +1288,9 @@ def update_sale_lines(sale, lines, user):
     sale.grand_total = grand_total
     sale.fifo_cost = fifo_total
     sale.gross_profit = money(subtotal_total - fifo_total)
-    sale.paid_amount = Decimal("0.00")
-    sale.balance_amount = grand_total
-    sale.payment_status = payment_status(grand_total, Decimal("0.00"))
+    sale.paid_amount = paid_amount
+    sale.balance_amount = money(grand_total - paid_amount)
+    sale.payment_status = payment_status(grand_total, paid_amount)
     _sync_receivable_from_sale(sale)
 
     audit(

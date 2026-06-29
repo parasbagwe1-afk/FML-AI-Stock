@@ -2,12 +2,14 @@ from app.extensions import db
 from app.models import (
     FIFOLayer,
     Item,
+    PaymentAllocation,
     Receivable,
     Sale,
     SaleLine,
     StockBook,
     StockLedgerEntry,
 )
+from app.services.payments import create_customer_receipt
 from app.services.transactions import (
     create_opening_stock,
     create_sale,
@@ -340,6 +342,99 @@ def test_sale_edit_can_change_item_before_receipt_allocation(app):
         assert available_quantity(data["ai"].id, data["ai_gst"].id, replacement_item.id) == 3
 
 
+def test_sale_edit_after_receipt_keeps_allocation_and_recalculates_balance(app):
+    with app.app_context():
+        data = ids()
+        seed_stock(data, "SALE-RECEIPT-EDIT-STOCK")
+        sale = create_sale(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "customer_id": data["customer"].id,
+                "sale_type": "GST",
+                "invoice_number": "RECEIPT-EDIT-INV",
+                "invoice_date": "2026-06-02",
+            },
+            [{"item_id": data["item"].id, "quantity": "1", "rate": "100", "gst_percent": "18"}],
+            admin(),
+        )
+        db.session.flush()
+        receivable = Receivable.query.filter_by(source_type="SALE", source_id=sale.id).one()
+        payment = create_customer_receipt(
+            {
+                "company_id": data["ai"].id,
+                "customer_id": data["customer"].id,
+                "receivable_id": receivable.id,
+                "payment_date": "2026-06-03",
+                "amount": "50",
+                "mode": "UPI",
+                "reference_number": "RECEIPT-EDIT-PAY",
+            },
+            admin(),
+        )
+        db.session.flush()
+        line = sale.lines[0]
+
+        update_sale_lines(
+            sale,
+            [{"line_id": line.id, "item_id": data["item"].id, "quantity": "2", "rate": "100", "gst_percent": "18"}],
+            admin(),
+        )
+        db.session.commit()
+
+        assert sale.grand_total == 236
+        assert sale.paid_amount == 50
+        assert sale.balance_amount == 186
+        assert sale.payment_status == "PARTIAL"
+        assert receivable.total_amount == 236
+        assert receivable.paid_amount == 50
+        assert receivable.balance_amount == 186
+        assert PaymentAllocation.query.filter_by(payment_id=payment.id).one().amount == 50
+
+
+def test_sale_edit_after_receipt_blocks_total_below_received(app):
+    with app.app_context():
+        data = ids()
+        seed_stock(data, "SALE-RECEIPT-LOW-STOCK")
+        sale = create_sale(
+            {
+                "company_id": data["ai"].id,
+                "stock_book_id": data["ai_gst"].id,
+                "customer_id": data["customer"].id,
+                "sale_type": "GST",
+                "invoice_number": "RECEIPT-LOW-INV",
+                "invoice_date": "2026-06-02",
+            },
+            [{"item_id": data["item"].id, "quantity": "1", "rate": "100", "gst_percent": "18"}],
+            admin(),
+        )
+        db.session.flush()
+        receivable = Receivable.query.filter_by(source_type="SALE", source_id=sale.id).one()
+        create_customer_receipt(
+            {
+                "company_id": data["ai"].id,
+                "customer_id": data["customer"].id,
+                "receivable_id": receivable.id,
+                "payment_date": "2026-06-03",
+                "amount": "100",
+                "mode": "UPI",
+            },
+            admin(),
+        )
+        db.session.flush()
+        line = sale.lines[0]
+
+        try:
+            update_sale_lines(
+                sale,
+                [{"line_id": line.id, "item_id": data["item"].id, "quantity": "1", "rate": "50", "gst_percent": "0"}],
+                admin(),
+            )
+            assert False, "Expected sale edit to reject totals below received amount"
+        except ValueError as exc:
+            assert "already received" in str(exc)
+
+
 def test_sale_delete_restores_fifo_stock(app):
     with app.app_context():
         data = ids()
@@ -390,6 +485,7 @@ def test_company_user_sees_edit_for_existing_sale(client, app):
     list_response = client.get("/transactions/sale")
     assert list_response.status_code == 200
     assert edit_href.encode() in list_response.data
+    assert f"/transactions/sale/{sale.id}/view".encode() in list_response.data
 
     edit_response = client.get(edit_href)
     assert edit_response.status_code == 200
@@ -399,6 +495,12 @@ def test_company_user_sees_edit_for_existing_sale(client, app):
     assert b'name="sale_type"' in edit_response.data
     assert b'name="stock_book_id"' in edit_response.data
     assert b"data-document-total-preview" in edit_response.data
+
+    view_response = client.get(f"/transactions/sale/{sale.id}/view")
+    view_html = view_response.get_data(as_text=True)
+    assert view_response.status_code == 200
+    assert "SALES-EDIT-INV" in view_html
+    assert "window.setTimeout(() => window.print()" not in view_html
 
 
 def test_transfer_header_edit_updates_linked_references(app):

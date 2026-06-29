@@ -1,5 +1,6 @@
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from app.core.company_context import active_company
@@ -7,7 +8,7 @@ from app.core.formatting import dec, qty
 from app.core.periods import period_from_args
 from app.core.security import require_permission
 from app.extensions import db
-from app.models import Company, Customer, Item, StockBook, Supplier
+from app.models import Company, Customer, Item, Payment, Receivable, Sale, StockBook, Supplier
 from app.services.audit import audit
 from app.services.customer_profile import customer_master_rows, customer_profile, paginate_rows
 from app.services.supplier_profile import supplier_transactions
@@ -157,6 +158,27 @@ def customer_detail(customer_id):
     )
 
 
+@bp.route("/customers/<int:customer_id>/print")
+@login_required
+def customer_print(customer_id):
+    config = config_or_404("customers")
+    require_permission(config["module"], "view")(lambda: None)()
+    selected_company_id = selected_customer_company_id()
+    date_from, date_to = period_from_args(request.args)
+    profile = customer_profile(customer_id, selected_company_id, date_from, date_to)
+    if not profile:
+        abort(404)
+    selected_company = db.session.get(Company, selected_company_id) if selected_company_id else None
+    return render_template(
+        "masters/customer_print.html",
+        profile=profile,
+        selected_company=selected_company,
+        selected_company_id=selected_company_id,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+
 @bp.route("/suppliers/<int:supplier_id>/transactions")
 @login_required
 def supplier_transaction_detail(supplier_id):
@@ -188,6 +210,7 @@ def create_record(kind):
         try:
             apply_form(record, kind)
             ensure_unique_code(record, kind)
+            ensure_unique_customer_name(record, kind)
             record.created_by_id = current_user.id
             db.session.add(record)
             db.session.flush()
@@ -218,6 +241,7 @@ def edit_record(kind, record_id):
             before = snapshot(record)
             apply_form(record, kind)
             ensure_unique_code(record, kind)
+            ensure_unique_customer_name(record, kind)
             record.updated_by_id = current_user.id
             audit("edit", config["title"], record.id, getattr(record, "code", None), before=before, after=snapshot(record), user=current_user)
             db.session.commit()
@@ -230,6 +254,31 @@ def edit_record(kind, record_id):
             db.session.rollback()
             flash(str(exc), "danger")
     return render_template("masters/form.html", kind=kind, config=config, record=record, companies=Company.query.filter_by(active=True).all())
+
+
+@bp.route("/customers/<int:customer_id>/delete", methods=["POST"])
+@login_required
+def delete_customer(customer_id):
+    config = config_or_404("customers")
+    require_permission(config["module"], "deactivate")(lambda: None)()
+    customer = db.session.get(Customer, customer_id)
+    if not customer:
+        flash("Customer not found.", "danger")
+        return redirect(url_for("masters.list_records", kind="customers"))
+    if customer_has_transactions(customer.id):
+        customer.active = False
+        customer.updated_by_id = current_user.id
+        audit("deactivate", config["title"], customer.id, customer.code, user=current_user)
+        db.session.commit()
+        flash("Customer has transactions, so it was deactivated instead of permanently deleted.", "warning")
+        return redirect(url_for("masters.list_records", kind="customers"))
+    before = snapshot(customer)
+    reference = customer.code
+    db.session.delete(customer)
+    audit("delete", config["title"], customer_id, reference, before=before, user=current_user)
+    db.session.commit()
+    flash("Customer deleted.", "success")
+    return redirect(url_for("masters.list_records", kind="customers"))
 
 
 @bp.route("/<kind>/<int:record_id>/deactivate", methods=["POST"])
@@ -266,11 +315,36 @@ def ensure_unique_code(record, kind):
     if not getattr(record, "code", None):
         return
     model = MASTER_CONFIG[kind]["model"]
-    query = model.query.filter(model.code == record.code)
+    code = record.code.strip().lower()
+    query = model.query.filter(func.lower(func.trim(model.code)) == code)
     if getattr(record, "id", None):
         query = query.filter(model.id != record.id)
     if query.first():
         raise ValueError(f"{singular_title(kind)} code '{record.code}' already exists. Use a different code or edit the existing record.")
+
+
+def ensure_unique_customer_name(record, kind):
+    if kind != "customers" or not getattr(record, "name", None):
+        return
+    name = record.name.strip().lower()
+    query = Customer.query.filter(func.lower(func.trim(Customer.name)) == name)
+    if getattr(record, "id", None):
+        query = query.filter(Customer.id != record.id)
+    duplicate = query.first()
+    if duplicate:
+        raise ValueError(
+            f"Customer '{record.name}' already exists as code {duplicate.code}. "
+            "Open the existing customer instead of creating a duplicate."
+        )
+
+
+def customer_has_transactions(customer_id):
+    checks = (
+        Sale.query.filter(Sale.customer_id == customer_id, Sale.is_void.is_(False)).with_entities(Sale.id),
+        Receivable.query.filter(Receivable.customer_id == customer_id).with_entities(Receivable.id),
+        Payment.query.filter(Payment.customer_id == customer_id).with_entities(Payment.id),
+    )
+    return any(query.first() for query in checks)
 
 
 def friendly_integrity_error(kind, exc):

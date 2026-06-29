@@ -59,6 +59,7 @@ def test_customer_list_search_clickable_names_and_profile_page(client, app):
     assert response.status_code == 200
     assert f"/masters/customers/{customer_id}" in html
     assert "View Details" in html
+    assert f"/masters/customers/{customer_id}/print" in html
     assert "GSTPROFILE1" in html
     assert "data-customer-jump" in html
 
@@ -75,8 +76,18 @@ def test_customer_list_search_clickable_names_and_profile_page(client, app):
     assert "PROFILE-INV-1" in detail_html
     assert "PROFILE-RCPT-1" in detail_html
     assert "Important profile note" in detail_html
+    assert "Overall Print" in detail_html
     assert f"/transactions/sale/{sale_id}/edit" in detail_html
     assert f"/transactions/sale/{sale_id}/export/pdf" in detail_html
+
+    print_response = client.get(f"/masters/customers/{customer_id}/print")
+    print_html = print_response.get_data(as_text=True)
+
+    assert print_response.status_code == 200
+    assert "Customer overall report" in print_html
+    assert "PROFILE-INV-1" in print_html
+    assert "PROFILE-RCPT-1" in print_html
+    assert "window.print()" in print_html
 
 
 def test_customer_profile_period_filters_invoices_and_summary(client, app):

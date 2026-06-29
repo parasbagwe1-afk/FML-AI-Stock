@@ -65,8 +65,15 @@
                 <td class="actions">
                   <a class="table-action" href="{{ url_for('masters.customer_detail', customer_id=customer.id, company_id=selected_company_id or '') }}">Transactions</a>
                   <a class="table-action" href="{{ url_for('masters.customer_detail', customer_id=customer.id, company_id=selected_company_id or '') }}">View Details</a>
+                  <a class="table-action" href="{{ url_for('masters.customer_print', customer_id=customer.id, company_id=selected_company_id or '') }}" target="_blank" rel="noopener">Overall Print</a>
                   {% if can(current_user, config.module, 'edit') %}
                     <a class="table-action" href="{{ url_for('masters.edit_record', kind=kind, record_id=customer.id) }}">Edit</a>
+                  {% endif %}
+                  {% if can(current_user, config.module, 'deactivate') %}
+                    <form method="post" action="{{ url_for('masters.delete_customer', customer_id=customer.id) }}" data-confirm="Delete this customer profile? If it has transactions, it will be deactivated to keep history safe.">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button class="link-button" type="submit">Delete</button>
+                    </form>
                   {% endif %}
                 </td>
               {% else %}

@@ -19,8 +19,15 @@
       <a class="secondary-button" href="{{ url_for('masters.customer_detail', customer_id=customer.id, company_id=selected_company_id or '') }}">This FY</a>
       <span class="spacer"></span>
       <span class="muted-copy">Period {{ date_from }} to {{ date_to }}</span>
+      <a class="secondary-button" href="{{ url_for('masters.customer_print', customer_id=customer.id, company_id=selected_company_id or '', date_from=date_from, date_to=date_to) }}" target="_blank" rel="noopener">Overall Print</a>
       {% if can(current_user, 'customers', 'edit') %}
         <a class="primary-button" href="{{ url_for('masters.edit_record', kind='customers', record_id=customer.id) }}">Edit Customer</a>
+      {% endif %}
+      {% if can(current_user, 'customers', 'deactivate') %}
+        <form method="post" action="{{ url_for('masters.delete_customer', customer_id=customer.id) }}" data-confirm="Delete this customer profile? If it has transactions, it will be deactivated to keep history safe.">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="link-button" type="submit">Delete Customer</button>
+        </form>
       {% endif %}
     </form>
   </section>

@@ -195,7 +195,12 @@ function formatPreviewMoney(value) {
 }
 
 function normalizeSearchText(value) {
-  return String(value || "").trim().toLocaleLowerCase();
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("en-IN");
 }
 
 function updateLineTotal(row) {

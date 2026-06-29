@@ -64,6 +64,11 @@ def test_customer_list_search_clickable_names_and_profile_page(client, app):
     assert "GSTPROFILE1" in html
     assert "data-customer-jump" in html
 
+    mixed_case_response = client.get("/masters/customers?q=mUmBaI")
+    mixed_case_html = mixed_case_response.get_data(as_text=True)
+    assert mixed_case_response.status_code == 200
+    assert "GSTPROFILE1" in mixed_case_html
+
     detail = client.get(f"/masters/customers/{customer_id}")
     detail_html = detail.get_data(as_text=True)
 
@@ -157,7 +162,7 @@ def test_customer_json_apis_use_customer_id(client, app):
 
     login(client)
 
-    listing = client.get("/customers?q=GSTPROFILE1")
+    listing = client.get("/customers?q=gstprofile1")
     assert listing.status_code == 200
     listing_json = listing.get_json()
     assert listing_json["customers"][0]["id"] == customer_id

@@ -96,7 +96,7 @@ def test_outstanding_customer_search_shows_filtered_balance_summary(client, app)
         db.session.commit()
 
     login(client)
-    response = client.get(f"/finance/outstanding?q={customer_name}")
+    response = client.get(f"/finance/outstanding?q={customer_name.swapcase()}")
 
     assert response.status_code == 200
     assert b"Customer Balance" in response.data

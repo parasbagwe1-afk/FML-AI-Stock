@@ -96,10 +96,14 @@ def list_records(kind):
     elif active_filter == "inactive" and hasattr(model, "active"):
         query = query.filter_by(active=False)
     if search:
+        normalized = search.lower()
+        conditions = []
+        if hasattr(model, "code"):
+            conditions.append(func.lower(func.coalesce(model.code, "")).like(f"%{normalized}%"))
         if hasattr(model, "name"):
-            query = query.filter(model.name.ilike(f"%{search}%"))
-        elif hasattr(model, "code"):
-            query = query.filter(model.code.ilike(f"%{search}%"))
+            conditions.append(func.lower(func.coalesce(model.name, "")).like(f"%{normalized}%"))
+        if conditions:
+            query = query.filter(db.or_(*conditions))
     records = query.order_by(getattr(model, "code", getattr(model, "id"))).all()
     return render_template("masters/list.html", kind=kind, config=config, records=records)
 

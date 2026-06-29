@@ -53,6 +53,10 @@ def require_payment_edit_permission():
         abort(403)
 
 
+def insensitive_like(column, search):
+    return db.func.lower(db.func.coalesce(column, "")).like(f"%{search.lower()}%")
+
+
 def receivable_edit_url(receivable):
     if receivable.source_type == "SALE":
         return url_for("transactions.sale_edit", sale_id=receivable.source_id)
@@ -289,19 +293,18 @@ def outstanding():
         receivables = receivables.filter_by(payment_status=status)
         payables = payables.filter_by(payment_status=status)
     if search:
-        pattern = f"%{search}%"
         receivables = receivables.outerjoin(Customer, Receivable.customer_id == Customer.id).filter(
             db.or_(
-                Receivable.document_number.ilike(pattern),
-                Customer.code.ilike(pattern),
-                Customer.name.ilike(pattern),
+                insensitive_like(Receivable.document_number, search),
+                insensitive_like(Customer.code, search),
+                insensitive_like(Customer.name, search),
             )
         )
         payables = payables.outerjoin(Supplier, Payable.supplier_id == Supplier.id).filter(
             db.or_(
-                Payable.document_number.ilike(pattern),
-                Supplier.code.ilike(pattern),
-                Supplier.name.ilike(pattern),
+                insensitive_like(Payable.document_number, search),
+                insensitive_like(Supplier.code, search),
+                insensitive_like(Supplier.name, search),
             )
         )
     receivable_entries = receivables.order_by(Receivable.due_date, Receivable.document_date).all()
@@ -314,18 +317,17 @@ def outstanding():
         advances = advances.filter(Payment.company_id == company.id)
         companies = companies.filter(Company.id == company.id)
     if search:
-        pattern = f"%{search}%"
         advances = advances.outerjoin(Customer, Payment.customer_id == Customer.id).outerjoin(
             Supplier, Payment.supplier_id == Supplier.id
         ).filter(
             db.or_(
-                Payment.reference_number.ilike(pattern),
-                Payment.payment_type.ilike(pattern),
-                Payment.mode.ilike(pattern),
-                Customer.code.ilike(pattern),
-                Customer.name.ilike(pattern),
-                Supplier.code.ilike(pattern),
-                Supplier.name.ilike(pattern),
+                insensitive_like(Payment.reference_number, search),
+                insensitive_like(Payment.payment_type, search),
+                insensitive_like(Payment.mode, search),
+                insensitive_like(Customer.code, search),
+                insensitive_like(Customer.name, search),
+                insensitive_like(Supplier.code, search),
+                insensitive_like(Supplier.name, search),
             )
         )
     advances = advances.order_by(Payment.payment_date.desc()).all()

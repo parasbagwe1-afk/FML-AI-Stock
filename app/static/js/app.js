@@ -609,6 +609,7 @@ initializeGlobalSearch();
 initializeDashboardVisuals();
 initializeCounters();
 initializeRipples();
+initializeSelectableRows();
 
 document.addEventListener("submit", (event) => {
   const form = event.target;
@@ -974,6 +975,72 @@ document.querySelectorAll(".line-row").forEach(updateLineTotal);
 document.querySelectorAll("form").forEach(updateDocumentTotal);
 initializeItemPickers();
 document.querySelectorAll("[data-live-search]").forEach(applyLiveSearch);
+initializeSelectableRows();
+
+function initializeSelectableRows(root = document) {
+  const tables = Array.from(root.querySelectorAll(".table-wrap table, table[data-selectable-rows]"));
+  tables.forEach((table, tableIndex) => {
+    if (table.dataset.rowSelectReady === "true") return;
+    table.dataset.rowSelectReady = "true";
+    const tableKey = table.dataset.rowSelectKey || fallbackTableKey(table, tableIndex);
+    table.dataset.rowSelectKey = tableKey;
+    const storageKey = `fastockflow:selected-rows:${window.location.pathname}:${window.location.search}:${tableKey}`;
+    const selected = loadSelectedRows(storageKey);
+    Array.from(table.querySelectorAll("tbody tr")).forEach((row, rowIndex) => {
+      if (row.matches("[data-live-empty], .empty") || row.querySelector("td.empty")) return;
+      const rowKey = row.dataset.rowKey || fallbackRowKey(row, rowIndex);
+      row.dataset.rowKey = rowKey;
+      row.dataset.rowSelectable = "true";
+      row.tabIndex = 0;
+      row.setAttribute("aria-selected", String(selected.has(rowKey)));
+      row.classList.toggle("is-row-selected", selected.has(rowKey));
+      row.addEventListener("click", (event) => {
+        if (event.target.closest("a, button, input, select, textarea, label, summary, [role='button'], [data-no-row-select]")) return;
+        if (window.getSelection?.().toString().trim()) return;
+        toggleSelectedRow(row, storageKey, selected);
+      });
+      row.addEventListener("keydown", (event) => {
+        if (event.key !== " " && event.key !== "Enter") return;
+        if (event.target.closest("a, button, input, select, textarea")) return;
+        event.preventDefault();
+        toggleSelectedRow(row, storageKey, selected);
+      });
+    });
+  });
+}
+
+function fallbackTableKey(table, tableIndex) {
+  return table.id || normalizeSearchText(table.closest(".panel")?.querySelector("h2, h1")?.textContent || `table-${tableIndex}`);
+}
+
+function fallbackRowKey(row, rowIndex) {
+  const text = Array.from(row.cells || [])
+    .map((cell) => cell.textContent)
+    .join("|");
+  return `${rowIndex}:${normalizeSearchText(text).slice(0, 180)}`;
+}
+
+function loadSelectedRows(storageKey) {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(storageKey) || "[]"));
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function saveSelectedRows(storageKey, selected) {
+  localStorage.setItem(storageKey, JSON.stringify(Array.from(selected)));
+}
+
+function toggleSelectedRow(row, storageKey, selected) {
+  const rowKey = row.dataset.rowKey;
+  const isSelected = selected.has(rowKey);
+  if (isSelected) selected.delete(rowKey);
+  else selected.add(rowKey);
+  row.classList.toggle("is-row-selected", !isSelected);
+  row.setAttribute("aria-selected", String(!isSelected));
+  saveSelectedRows(storageKey, selected);
+}
 
 const calculatorStates = new WeakMap();
 const calendarStates = new WeakMap();

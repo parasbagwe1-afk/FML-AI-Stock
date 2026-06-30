@@ -1924,6 +1924,39 @@ html[data-theme="dark"] tbody tr:hover {
   background: rgba(182, 141, 45, 0.14);
 }
 
+tbody tr[data-row-selectable="true"] {
+  cursor: pointer;
+  outline: none;
+}
+
+tbody tr[data-row-selectable="true"]:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.55);
+}
+
+tbody tr.is-row-selected,
+tbody tr.is-row-selected:nth-child(even),
+tbody tr.is-row-selected:hover {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.18), rgba(182, 141, 45, 0.10)) !important;
+  box-shadow: inset 5px 0 0 #38BDF8;
+}
+
+body.theme-firsttech tbody tr.is-row-selected,
+body.theme-firsttech tbody tr.is-row-selected:nth-child(even),
+body.theme-firsttech tbody tr.is-row-selected:hover,
+body.theme-aditya tbody tr.is-row-selected,
+body.theme-aditya tbody tr.is-row-selected:nth-child(even),
+body.theme-aditya tbody tr.is-row-selected:hover {
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.20), rgba(182, 141, 45, 0.14)) !important;
+  box-shadow: inset 5px 0 0 #38BDF8;
+}
+
+html[data-theme="dark"] tbody tr.is-row-selected,
+html[data-theme="dark"] tbody tr.is-row-selected:nth-child(even),
+html[data-theme="dark"] tbody tr.is-row-selected:hover {
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.24), rgba(246, 217, 138, 0.12)) !important;
+  box-shadow: inset 5px 0 0 #7DD3FC;
+}
+
 input,
 select,
 textarea {

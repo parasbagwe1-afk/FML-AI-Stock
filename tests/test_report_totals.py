@@ -310,6 +310,26 @@ def test_item_ledger_shows_supplier_debtor_and_running_stock(client, app):
     assert "₹300.00" in html
 
 
+def test_current_stock_report_links_rows_to_item_history(client, app):
+    with app.app_context():
+        data = ids()
+        company_id = data["ai"].id
+        stock_book_id = data["ai_gst"].id
+        item_id = data["item"].id
+        db.session.commit()
+
+    login(client)
+    response = client.get("/reports/current-stock")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "History" in html
+    assert 'data-selectable-rows' in html
+    assert f"/reports/item-ledger?company_id={company_id}" in html
+    assert f"item_id={item_id}" in html
+    assert f"stock_book_id={stock_book_id}" in html
+
+
 def test_customer_receipt_overage_allocates_next_open_bill(app):
     with app.app_context():
         data = ids()

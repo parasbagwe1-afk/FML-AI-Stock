@@ -24,15 +24,24 @@
       </div>
     {% endif %}
     <div class="table-wrap tall">
-      <table id="report_table">
-        <thead><tr>{% for header in headers %}<th>{{ header }}</th>{% endfor %}</tr></thead>
+      <table id="report_table" data-selectable-rows data-row-select-key="report-{{ request.view_args.name }}">
+        <thead><tr>{% for header in headers %}<th>{{ header }}</th>{% endfor %}{% if row_actions and row_actions|select|list %}<th>Actions</th>{% endif %}</tr></thead>
         <tbody>
           {% for row in rows %}
-            <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+            <tr data-row-key="{{ request.view_args.name }}-{{ loop.index }}">
+              {% for cell in row %}<td>{{ cell }}</td>{% endfor %}
+              {% if row_actions and row_actions|select|list %}
+                <td class="actions">
+                  {% for action in row_actions[loop.index0] %}
+                    <a class="table-action" href="{{ action.url }}" title="{{ action.title }}">{{ action.label }}</a>
+                  {% endfor %}
+                </td>
+              {% endif %}
+            </tr>
           {% else %}
-            <tr><td colspan="{{ headers|length }}" class="empty">No rows for this report.</td></tr>
+            <tr><td colspan="{{ headers|length + (1 if row_actions and row_actions|select|list else 0) }}" class="empty">No rows for this report.</td></tr>
           {% endfor %}
-          <tr class="empty live-empty" data-live-empty hidden><td colspan="{{ headers|length }}">No matching rows.</td></tr>
+          <tr class="empty live-empty" data-live-empty hidden><td colspan="{{ headers|length + (1 if row_actions and row_actions|select|list else 0) }}">No matching rows.</td></tr>
         </tbody>
       </table>
     </div>

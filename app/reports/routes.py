@@ -383,9 +383,59 @@ def show(name):
         title=title,
         headers=headers,
         rows=rows,
+        row_actions=report_row_actions(name, rows),
         reports=REPORT_TITLES,
         totals=report_totals(headers, rows),
     )
+
+
+def report_row_actions(name, rows):
+    if name in {"current-stock", "fifo-valuation"}:
+        return stock_item_history_actions(rows, company_index=0, stock_book_index=1, item_index=2, item_mode="code")
+    if name == "fifo-layers":
+        return stock_item_history_actions(rows, company_index=0, stock_book_index=1, item_index=2, item_mode="display")
+    if name == "stock-ledger":
+        return stock_item_history_actions(rows, company_index=1, stock_book_index=2, item_index=3, item_mode="display")
+    if name == "stock-alerts":
+        return stock_item_history_actions(rows, company_index=1, stock_book_index=2, item_index=3, item_mode="display")
+    return [[] for _ in rows]
+
+
+def stock_item_history_actions(rows, company_index, stock_book_index, item_index, item_mode):
+    companies = {company.code: company for company in Company.query.all()}
+    items_by_code = {item.code: item for item in Item.query.all()}
+    items_by_display = {item.display_name: item for item in Item.query.all()}
+    books = {
+        (book.company_id, book.name): book
+        for book in StockBook.query.all()
+    }
+    actions = []
+    for row in rows:
+        try:
+            company = companies.get(str(row[company_index]))
+            item_lookup = items_by_code if item_mode == "code" else items_by_display
+            item = item_lookup.get(str(row[item_index]))
+            stock_book = books.get((company.id, str(row[stock_book_index]))) if company else None
+        except IndexError:
+            actions.append([])
+            continue
+        if company and item:
+            args = {
+                "company_id": company.id,
+                "item_id": item.id,
+            }
+            if stock_book:
+                args["stock_book_id"] = stock_book.id
+            actions.append([
+                {
+                    "label": "History",
+                    "url": url_for("reports.item_ledger", **args),
+                    "title": f"Open movement history for {item.display_name}",
+                }
+            ])
+        else:
+            actions.append([])
+    return actions
 
 
 def build_report(name):

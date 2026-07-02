@@ -604,23 +604,37 @@ document.addEventListener("change", async (event) => {
 });
 
 const SHORTCUT_GUIDE = [
-  ["Esc / Alt + ←", "Go back to the previous app page"],
+  ["F1", "Help / shortcut list"],
+  ["F2", "Date"],
+  ["F3", "Company"],
+  ["F4", "Contra / transfer voucher"],
+  ["F5", "Payment"],
+  ["F6", "Receipt"],
+  ["F7", "Journal / opening voucher"],
+  ["F8", "Sales"],
+  ["F9", "Purchase"],
+  ["F10", "Other vouchers"],
+  ["F12", "Configure / shortcut list"],
+  ["E", "Autofill document number"],
+  ["H", "Change mode, for example GST/CASH"],
+  ["I", "More details / remarks"],
+  ["O", "Related reports"],
+  ["L", "Optional / due-date field"],
+  ["T", "Post-dated / due-date field"],
+  ["J", "Stat adjustment / GST field"],
+  ["Esc / Alt + ←", "Go back"],
   ["Ctrl + F", "Focus page search"],
-  ["Alt + F", "Run the current Find/Search"],
-  ["Ctrl + S / Ctrl + Enter", "Save the current form"],
-  ["Alt + A / Alt + N", "Add a line or add a new entry"],
-  ["F2 / Alt + E", "Edit the selected row"],
-  ["Alt + D", "Delete the selected row"],
-  ["Ctrl + P", "Print the selected row or current page"],
-  ["Alt + P", "Open PDF for the selected row/report"],
-  ["Alt + X", "Open XL/XLSX for the selected row/report"],
-  ["Alt + 1-9", "Open sidebar menu items"],
-  ["Alt + C", "Open calculator"],
-  ["Alt + L", "Open calendar"],
-  ["F1", "Show this shortcut help"],
+  ["Ctrl + S / Ctrl + Enter", "Save current form"],
+  ["Alt + A / Alt + N", "Add line or add entry"],
+  ["Alt + E", "Edit selected row"],
+  ["Alt + D", "Delete selected row"],
+  ["Ctrl + P", "Print selected row or current page"],
+  ["Alt + P", "Open PDF for selected row/report"],
+  ["Alt + X", "Open XL/XLSX for selected row/report"],
 ];
 
 let shortcutToastTimer;
+const SHORTCUT_INTENT_KEY = "fastockflow:shortcut-intent";
 
 function initializeKeyboardShortcuts() {
   if (document.body.dataset.shortcutsReady === "true") return;
@@ -675,7 +689,21 @@ function handleKeyboardShortcut(event) {
     return;
   }
 
+  if (/^f\d{1,2}$/.test(key)) {
+    event.preventDefault();
+    handleTallyFunctionKey(key);
+    return;
+  }
+
   if (typing && !event.altKey) return;
+
+  if (!event.altKey && !primaryKey) {
+    const handled = handleTallyLetterKey(key);
+    if (handled) {
+      event.preventDefault();
+      return;
+    }
+  }
 
   if (event.altKey && key === "f") {
     event.preventDefault();
@@ -729,6 +757,40 @@ function handleKeyboardShortcut(event) {
     event.preventDefault();
     openSidebarShortcut(Number(key));
   }
+}
+
+function handleTallyFunctionKey(key) {
+  const actions = {
+    f1: () => showShortcutHelp(),
+    f2: () => focusDateShortcut(),
+    f3: () => focusCompanyShortcut(),
+    f4: () => navigateShortcut("/transactions/transfer", "Contra / transfer voucher"),
+    f5: () => openPaymentVoucherShortcut(),
+    f6: () => openReceiptVoucherShortcut(),
+    f7: () => navigateShortcut("/transactions/opening", "Journal / opening voucher"),
+    f8: () => navigateShortcut("/transactions/sale", "Sales voucher"),
+    f9: () => navigateShortcut("/transactions/purchase", "Purchase voucher"),
+    f10: () => navigateShortcut("/transactions/opening", "Other vouchers"),
+    f12: () => showShortcutHelp(),
+  };
+  const action = actions[key];
+  if (action) action();
+}
+
+function handleTallyLetterKey(key) {
+  const actions = {
+    e: () => triggerAutoFillShortcut(),
+    h: () => changeModeShortcut(),
+    i: () => focusMoreDetailsShortcut(),
+    o: () => openRelatedReportShortcut(),
+    l: () => focusOptionalShortcut(),
+    t: () => focusPostDatedShortcut(),
+    j: () => focusStatAdjustmentShortcut(),
+  };
+  const action = actions[key];
+  if (!action) return false;
+  action();
+  return true;
 }
 
 function isEditableShortcutTarget(target) {
@@ -880,6 +942,206 @@ function openSidebarShortcut(position) {
   return true;
 }
 
+function navigateShortcut(path, message, intentAction = "") {
+  if (intentAction) {
+    sessionStorage.setItem(
+      SHORTCUT_INTENT_KEY,
+      JSON.stringify({ action: intentAction, createdAt: Date.now() })
+    );
+  }
+  if (window.location.pathname === path) {
+    if (intentAction) runShortcutIntent(intentAction);
+    showShortcutHint(message);
+    return true;
+  }
+  showShortcutHint(message);
+  window.location.assign(path);
+  return true;
+}
+
+function consumeShortcutIntent() {
+  let intent;
+  try {
+    intent = JSON.parse(sessionStorage.getItem(SHORTCUT_INTENT_KEY) || "null");
+  } catch (_) {
+    intent = null;
+  }
+  sessionStorage.removeItem(SHORTCUT_INTENT_KEY);
+  if (!intent || !intent.action || Date.now() - Number(intent.createdAt || 0) > 15000) return;
+  window.setTimeout(() => runShortcutIntent(intent.action), 120);
+}
+
+function runShortcutIntent(action) {
+  if (action === "payment") {
+    focusPaymentVoucherForm("payment");
+    return;
+  }
+  if (action === "receipt") {
+    focusPaymentVoucherForm("receipt");
+    return;
+  }
+  if (action === "date") {
+    focusDateShortcut();
+    return;
+  }
+  if (action === "company") {
+    focusCompanyShortcut();
+  }
+}
+
+function openPaymentVoucherShortcut() {
+  if (window.location.pathname === "/finance/payments") {
+    return focusPaymentVoucherForm("payment");
+  }
+  return navigateShortcut("/finance/payments", "Payment voucher", "payment");
+}
+
+function openReceiptVoucherShortcut() {
+  if (window.location.pathname === "/finance/payments") {
+    return focusPaymentVoucherForm("receipt");
+  }
+  return navigateShortcut("/finance/payments", "Receipt voucher", "receipt");
+}
+
+function focusPaymentVoucherForm(kind) {
+  const actionNeedle = kind === "receipt" ? "customer-receipt" : "supplier-payment";
+  const form = Array.from(document.querySelectorAll("form")).find((candidate) =>
+    String(candidate.getAttribute("action") || "").includes(actionNeedle)
+  );
+  if (!form) {
+    showShortcutHint(kind === "receipt" ? "Receipt form not found" : "Payment form not found");
+    return false;
+  }
+  const selector =
+    kind === "receipt"
+      ? 'input[name="customer_search"], select[name="receivable_id"], input[name="amount"]'
+      : 'input[name="supplier_search"], select[name="payable_id"], input[name="amount"]';
+  const target = visibleShortcutElements(selector, form)[0] || visibleShortcutElements("input, select, textarea", form)[0];
+  focusShortcutElement(target, kind === "receipt" ? "Receipt voucher ready" : "Payment voucher ready");
+  return true;
+}
+
+function focusDateShortcut() {
+  const form = document.activeElement?.closest?.("form");
+  const selector =
+    'input[type="date"], input[name="invoice_date"], input[name="bill_date"], input[name="payment_date"], input[name="due_date"], input[name="date_from"], input[name="date_to"]';
+  const target = (form && visibleShortcutElements(selector, form)[0]) || visibleShortcutElements(selector)[0];
+  if (!target) {
+    showShortcutHint("No date field found");
+    return false;
+  }
+  return focusShortcutElement(target, "Date field focused", true);
+}
+
+function focusCompanyShortcut() {
+  const form = document.activeElement?.closest?.("form");
+  const selector = 'select[name="company_id"], select[name="from_company_id"], select[name="to_company_id"]';
+  const target = (form && visibleShortcutElements(selector, form)[0]) || visibleShortcutElements(selector)[0];
+  if (target) return focusShortcutElement(target, "Company field focused");
+  const switcher = visibleShortcutElements(".footer-company-form button, .company-chip")[0];
+  if (switcher) return focusShortcutElement(switcher, "Company switcher focused");
+  return navigateShortcut("/company/choose", "Company selector");
+}
+
+function triggerAutoFillShortcut() {
+  const form = document.activeElement?.closest?.("form");
+  const button = (form && visibleShortcutElements("[data-auto-ref]", form)[0]) || visibleShortcutElements("[data-auto-ref]")[0];
+  if (!button) {
+    showShortcutHint("No autofill button on this page");
+    return false;
+  }
+  button.click();
+  showShortcutHint("Autofill applied");
+  return true;
+}
+
+function changeModeShortcut() {
+  const form = document.activeElement?.closest?.("form");
+  const selector = 'select[name="sale_type"], select[name="purchase_type"]';
+  const mode = (form && visibleShortcutElements(selector, form)[0]) || visibleShortcutElements(selector)[0];
+  if (mode) {
+    const current = mode.value;
+    const next = Array.from(mode.options).find((option) => option.value !== current);
+    if (next) {
+      mode.value = next.value;
+      mode.dispatchEvent(new Event("change", { bubbles: true }));
+      showShortcutHint(`Mode changed to ${next.textContent.trim() || next.value}`);
+      return true;
+    }
+  }
+  const paymentMode = (form && visibleShortcutElements('select[name="mode"]', form)[0]) || visibleShortcutElements('select[name="mode"]')[0];
+  if (paymentMode) return focusShortcutElement(paymentMode, "Payment mode focused");
+  showShortcutHint("No mode field found");
+  return false;
+}
+
+function focusMoreDetailsShortcut() {
+  const form = document.activeElement?.closest?.("form");
+  const target = (form && visibleShortcutElements("textarea", form)[0]) || visibleShortcutElements("textarea")[0];
+  if (!target) {
+    showShortcutHint("No more details field found");
+    return false;
+  }
+  return focusShortcutElement(target, "More details focused");
+}
+
+function openRelatedReportShortcut() {
+  const report = visibleShortcutElements("main a").find((link) =>
+    /\b(report|monthly|outstanding|ledger|stock)\b/.test(normalizeSearchText(link.textContent))
+  );
+  if (report) return clickShortcutAction(report, "Related report opened");
+  return navigateShortcut("/reports/", "Reports");
+}
+
+function focusOptionalShortcut() {
+  const form = document.activeElement?.closest?.("form");
+  const selector = 'input[name="due_date"], textarea[name="remarks"], textarea';
+  const target = (form && visibleShortcutElements(selector, form)[0]) || visibleShortcutElements(selector)[0];
+  if (!target) {
+    showShortcutHint("No optional field found");
+    return false;
+  }
+  return focusShortcutElement(target, "Optional field focused", target.type === "date");
+}
+
+function focusPostDatedShortcut() {
+  const form = document.activeElement?.closest?.("form");
+  const selector = 'input[name="due_date"], input[name="payment_date"], input[type="date"]';
+  const target = (form && visibleShortcutElements(selector, form)[0]) || visibleShortcutElements(selector)[0];
+  if (!target) {
+    showShortcutHint("No post-dated field found");
+    return false;
+  }
+  return focusShortcutElement(target, "Post-dated field focused", true);
+}
+
+function focusStatAdjustmentShortcut() {
+  const form = document.activeElement?.closest?.("form");
+  const selector = 'input[name="gst_percent[]"], select[name="sale_type"], select[name="purchase_type"]';
+  const target = (form && visibleShortcutElements(selector, form)[0]) || visibleShortcutElements(selector)[0];
+  if (!target) {
+    showShortcutHint("No statutory/GST field found");
+    return false;
+  }
+  return focusShortcutElement(target, "Stat/GST field focused", target.type === "date");
+}
+
+function focusShortcutElement(element, message, showPicker = false) {
+  if (!element) return false;
+  element.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  element.focus?.({ preventScroll: true });
+  element.select?.();
+  if (showPicker && typeof element.showPicker === "function") {
+    try {
+      element.showPicker();
+    } catch (_) {
+      // Some browsers only allow showPicker from direct pointer events.
+    }
+  }
+  showShortcutHint(message);
+  return true;
+}
+
 function showShortcutHelp() {
   closeShortcutHelp();
   const backdrop = document.createElement("div");
@@ -979,6 +1241,7 @@ initializeCounters();
 initializeRipples();
 initializeSelectableRows();
 initializeKeyboardShortcuts();
+consumeShortcutIntent();
 
 document.addEventListener("submit", (event) => {
   const form = event.target;

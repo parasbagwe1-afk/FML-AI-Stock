@@ -897,7 +897,10 @@ function triggerActionShortcut(patterns, successMessage, missingMessage, selecte
 }
 
 function findActionByLabel(root, patterns) {
-  return visibleShortcutElements("a, button", root).find((element) => {
+  const candidates = Array.from(root.querySelectorAll("a, button")).filter(
+    (element) => isShortcutVisible(element) || element.closest("[data-action-menu]")
+  );
+  return candidates.find((element) => {
     if (element.disabled || element.closest("[data-shortcut-help], [data-back-button], [data-theme-toggle]")) return false;
     const label = normalizeSearchText(
       [
@@ -1213,7 +1216,32 @@ function showShortcutHint(message) {
   shortcutToastTimer = window.setTimeout(() => toast.remove(), 1800);
 }
 
+function closeActionMenus(exceptMenu = null) {
+  let closed = false;
+  document.querySelectorAll("[data-action-menu].is-open").forEach((menu) => {
+    if (menu === exceptMenu) return;
+    menu.classList.remove("is-open");
+    menu.querySelector("[data-action-menu-toggle]")?.setAttribute("aria-expanded", "false");
+    closed = true;
+  });
+  return closed;
+}
+
 document.addEventListener("click", (event) => {
+  const actionToggle = event.target.closest("[data-action-menu-toggle]");
+  if (actionToggle) {
+    event.preventDefault();
+    const menu = actionToggle.closest("[data-action-menu]");
+    const shouldOpen = !menu.classList.contains("is-open");
+    closeActionMenus(menu);
+    menu.classList.toggle("is-open", shouldOpen);
+    actionToggle.setAttribute("aria-expanded", String(shouldOpen));
+    return;
+  }
+  if (!event.target.closest("[data-action-menu]")) {
+    closeActionMenus();
+  }
+
   const back = event.target.closest("[data-back-button]");
   if (back) {
     event.preventDefault();
@@ -1228,6 +1256,13 @@ document.addEventListener("click", (event) => {
   if (event.target.closest("[data-shortcut-close]") || event.target.matches("[data-shortcut-overlay]")) {
     event.preventDefault();
     closeShortcutHelp();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && closeActionMenus()) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
   }
 });
 

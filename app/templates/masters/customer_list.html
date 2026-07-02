@@ -42,10 +42,10 @@
       <h2>Customer / Supplier Directory</h2>
       <span class="muted-copy">{{ pagination.total }} record{{ '' if pagination.total == 1 else 's' }}</span>
     </div>
-    <div class="table-wrap">
-      <table id="customers_table">
+    <div class="table-wrap enterprise-table-wrap">
+      <table id="customers_table" class="enterprise-table customer-directory-table" data-sticky-columns="3">
         <thead>
-          <tr><th>Company</th><th>Party</th><th>Contact</th><th>Mobile</th><th>GST</th><th>City</th><th>Status</th><th>Actions</th></tr>
+          <tr><th>Company</th><th>Party</th><th>Status</th><th>Contact</th><th>Mobile</th><th>GST</th><th>City</th><th>Actions</th></tr>
         </thead>
         <tbody>
           {% for row in rows %}
@@ -57,25 +57,32 @@
                   <a class="customer-link" href="{{ url_for('masters.customer_detail', customer_id=customer.id, company_id=selected_company_id or '') }}">{{ customer.name }}</a>
                   <small class="customer-subtext">Customer · {{ customer.code }}{% if customer.mobile %} · {{ customer.mobile }}{% endif %}{% if customer.city %} · {{ customer.city }}{% endif %}{% if customer.gst_number %} · GST {{ customer.gst_number }}{% endif %}</small>
                 </td>
+                <td><span class="status {{ 'ok' if customer.active else 'muted' }}">{{ 'Active' if customer.active else 'Inactive' }}</span></td>
                 <td>{{ customer.contact_person or '' }}</td>
                 <td>{{ customer.mobile or '' }}</td>
                 <td>{{ customer.gst_number or '' }}</td>
                 <td>{{ customer.city or '' }}</td>
-                <td><span class="status {{ 'ok' if customer.active else 'muted' }}">{{ 'Active' if customer.active else 'Inactive' }}</span></td>
                 <td class="actions">
-                  <a class="table-action" href="{{ url_for('masters.customer_detail', customer_id=customer.id, company_id=selected_company_id or '') }}">Transactions</a>
-                  <a class="table-action" href="{{ url_for('masters.customer_detail', customer_id=customer.id, company_id=selected_company_id or '') }}">View Details</a>
-                  <a class="table-action" href="{{ url_for('masters.customer_print', customer_id=customer.id, company_id=selected_company_id or '') }}" target="_blank" rel="noopener">Overall Print</a>
-                  <a class="table-action" href="{{ url_for('masters.customer_export', customer_id=customer.id, fmt='pdf', company_id=selected_company_id or '') }}">Overall PDF</a>
-                  {% if can(current_user, config.module, 'edit') %}
-                    <a class="table-action" href="{{ url_for('masters.edit_record', kind=kind, record_id=customer.id) }}">Edit</a>
-                  {% endif %}
-                  {% if can(current_user, config.module, 'deactivate') %}
-                    <form method="post" action="{{ url_for('masters.delete_customer', customer_id=customer.id) }}" data-confirm="Delete this customer profile? If it has transactions, it will be deactivated to keep history safe.">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <button class="link-button" type="submit">Delete</button>
-                    </form>
-                  {% endif %}
+                  <div class="action-menu" data-action-menu>
+                    <button class="table-action action-menu-toggle" type="button" data-action-menu-toggle aria-haspopup="true" aria-expanded="false">
+                      Actions
+                    </button>
+                    <div class="action-menu-list" role="menu">
+                      <a href="{{ url_for('masters.customer_detail', customer_id=customer.id, company_id=selected_company_id or '') }}" role="menuitem">Transactions</a>
+                      <a href="{{ url_for('masters.customer_detail', customer_id=customer.id, company_id=selected_company_id or '') }}" role="menuitem">View Details</a>
+                      <a href="{{ url_for('masters.customer_print', customer_id=customer.id, company_id=selected_company_id or '') }}" target="_blank" rel="noopener" role="menuitem">Overall Print</a>
+                      <a href="{{ url_for('masters.customer_export', customer_id=customer.id, fmt='pdf', company_id=selected_company_id or '') }}" role="menuitem">Overall PDF</a>
+                      {% if can(current_user, config.module, 'edit') %}
+                        <a href="{{ url_for('masters.edit_record', kind=kind, record_id=customer.id) }}" role="menuitem">Edit</a>
+                      {% endif %}
+                      {% if can(current_user, config.module, 'deactivate') %}
+                        <form method="post" action="{{ url_for('masters.delete_customer', customer_id=customer.id) }}" data-confirm="Delete this customer profile? If it has transactions, it will be deactivated to keep history safe.">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                          <button type="submit" role="menuitem">Delete</button>
+                        </form>
+                      {% endif %}
+                    </div>
+                  </div>
                 </td>
               {% else %}
                 {% set supplier = row.supplier %}
@@ -83,17 +90,25 @@
                   <a class="customer-link" href="{{ url_for('masters.supplier_transaction_detail', supplier_id=supplier.id, company_id=selected_company_id or '') }}">{{ supplier.name }}</a>
                   <small class="customer-subtext">Supplier · {{ supplier.code }}{% if supplier.mobile %} · {{ supplier.mobile }}{% endif %}{% if supplier.gst_number %} · GST {{ supplier.gst_number }}{% endif %}</small>
                 </td>
+                <td><span class="status {{ 'ok' if supplier.active else 'muted' }}">{{ 'Supplier' if supplier.active else 'Inactive supplier' }}</span></td>
                 <td></td>
                 <td>{{ supplier.mobile or '' }}</td>
                 <td>{{ supplier.gst_number or '' }}</td>
                 <td></td>
-                <td><span class="status {{ 'ok' if supplier.active else 'muted' }}">{{ 'Supplier' if supplier.active else 'Inactive supplier' }}</span></td>
                 <td class="actions">
-                  <a class="table-action" href="{{ url_for('masters.supplier_transaction_detail', supplier_id=supplier.id, company_id=selected_company_id or '') }}">Transactions</a>
-                  <a class="table-action" href="{{ url_for('masters.list_records', kind='suppliers', q=supplier.name) }}">Open Supplier</a>
-                  {% if can(current_user, 'suppliers', 'edit') %}
-                    <a class="table-action" href="{{ url_for('masters.edit_record', kind='suppliers', record_id=supplier.id) }}">Edit</a>
-                  {% endif %}
+                  <div class="action-menu" data-action-menu>
+                    <button class="table-action action-menu-toggle" type="button" data-action-menu-toggle aria-haspopup="true" aria-expanded="false">
+                      Actions
+                    </button>
+                    <div class="action-menu-list" role="menu">
+                      <a href="{{ url_for('masters.supplier_transaction_detail', supplier_id=supplier.id, company_id=selected_company_id or '') }}" role="menuitem">Transactions</a>
+                      <a href="{{ url_for('masters.supplier_transaction_detail', supplier_id=supplier.id, company_id=selected_company_id or '') }}" role="menuitem">View Details</a>
+                      <a href="{{ url_for('masters.list_records', kind='suppliers', q=supplier.name) }}" role="menuitem">Open Supplier</a>
+                      {% if can(current_user, 'suppliers', 'edit') %}
+                        <a href="{{ url_for('masters.edit_record', kind='suppliers', record_id=supplier.id) }}" role="menuitem">Edit</a>
+                      {% endif %}
+                    </div>
+                  </div>
                 </td>
               {% endif %}
             </tr>

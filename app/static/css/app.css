@@ -108,13 +108,15 @@ button, input, select, textarea { font: inherit; }
   min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(250px, 268px) minmax(0, 1fr);
+  align-items: stretch;
 }
 .sidebar {
   position: sticky;
   top: 0;
   height: 100vh;
   height: 100dvh;
-  min-height: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -1537,12 +1539,37 @@ html[data-theme="dark"] body {
   grid-template-columns: minmax(268px, 292px) minmax(0, 1fr);
 }
 
+@media (min-width: 981px) {
+  .app-shell {
+    --sidebar-fill-width: clamp(268px, 18vw, 292px);
+    background:
+      linear-gradient(
+        90deg,
+        rgba(27, 27, 29, 0.99) 0,
+        rgba(35, 27, 10, 0.99) var(--sidebar-fill-width),
+        transparent var(--sidebar-fill-width)
+      );
+  }
+
+  body.sidebar-collapsed .app-shell {
+    --sidebar-fill-width: 92px;
+  }
+
+  .sidebar {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+}
+
 .sidebar {
   padding: 18px 16px;
   gap: 18px;
   background: var(--sidebar-bg);
   border-right: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow: 16px 0 46px rgba(0, 0, 0, 0.18);
+  align-self: stretch;
 }
 
 .sidebar::before {
@@ -2107,6 +2134,7 @@ body.theme-aditya .panel-title a {
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--card);
+  position: relative;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -2117,6 +2145,70 @@ body.theme-aditya .panel-title a {
   scroll-behavior: smooth;
   scrollbar-width: thin;
   scrollbar-color: rgba(182, 141, 45, 0.58) transparent;
+}
+
+.table-wrap:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.table-scroll-controls {
+  position: sticky;
+  left: 0;
+  top: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  min-width: min(100%, 280px);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.86) 34%, var(--card));
+  backdrop-filter: blur(10px);
+}
+
+.table-scroll-controls[hidden] {
+  display: none !important;
+}
+
+.table-scroll-hint {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 760;
+  margin-right: auto;
+  white-space: nowrap;
+}
+
+.table-scroll-button {
+  width: 34px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(182, 141, 45, 0.34);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.90);
+  color: #7A5A18;
+  font-size: 1.2rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(17, 24, 39, 0.08);
+  transition: transform 160ms var(--ease-premium), box-shadow 160ms ease, opacity 160ms ease, border-color 160ms ease;
+}
+
+.table-scroll-button:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.03);
+  border-color: rgba(182, 141, 45, 0.62);
+  box-shadow: 0 14px 30px rgba(17, 24, 39, 0.13);
+}
+
+.table-scroll-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.36;
+  box-shadow: none;
 }
 
 .table-wrap::-webkit-scrollbar {
@@ -2380,6 +2472,19 @@ html[data-theme="dark"] .music-now {
   background: #050505;
   border-color: rgba(255, 255, 255, 0.13);
   color: var(--text);
+}
+
+html[data-theme="dark"] .table-scroll-controls {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.12), rgba(5, 5, 5, 0.86) 34%, #050505);
+  border-color: rgba(255, 255, 255, 0.13);
+}
+
+html[data-theme="dark"] .table-scroll-button {
+  background: #030303;
+  color: #F6D98A;
+  border-color: rgba(246, 217, 138, 0.36);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.58);
 }
 
 html[data-theme="dark"] .item-combobox-button {
@@ -2970,6 +3075,14 @@ input[type="range"] {
     --sticky-col-1: 70px;
     --sticky-col-2: 176px;
     --sticky-col-3: 92px;
+  }
+  .table-scroll-controls {
+    padding: 7px 8px;
+  }
+  .table-scroll-hint {
+    max-width: 42vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .enterprise-table th,
   .enterprise-table td {

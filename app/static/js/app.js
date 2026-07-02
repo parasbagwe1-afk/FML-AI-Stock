@@ -136,14 +136,6 @@ document.addEventListener("click", async (event) => {
     applyLiveSearch(input);
   }
 
-  const tableScrollButton = event.target.closest("[data-table-scroll-left], [data-table-scroll-right]");
-  if (tableScrollButton) {
-    event.preventDefault();
-    const wrap = tableScrollButton.closest(".table-wrap");
-    scrollTableWrap(wrap, tableScrollButton.matches("[data-table-scroll-right]") ? 1 : -1);
-    return;
-  }
-
   const customerJumpButton = event.target.closest("[data-customer-jump-form] button");
   if (customerJumpButton) {
     event.preventDefault();
@@ -639,12 +631,10 @@ const SHORTCUT_GUIDE = [
   ["Ctrl + P", "Print selected row or current page"],
   ["Alt + P", "Open PDF for selected row/report"],
   ["Alt + X", "Open XL/XLSX for selected row/report"],
-  ["Shift + ← / →", "Scroll active table sideways"],
 ];
 
 let shortcutToastTimer;
 const SHORTCUT_INTENT_KEY = "fastockflow:shortcut-intent";
-let activeTableScroller = null;
 
 function initializeKeyboardShortcuts() {
   if (document.body.dataset.shortcutsReady === "true") return;
@@ -678,10 +668,6 @@ function handleKeyboardShortcut(event) {
   if (event.altKey && key === "arrowleft") {
     event.preventDefault();
     navigateBack();
-    return;
-  }
-
-  if ((key === "arrowleft" || key === "arrowright") && handleTableArrowShortcut(event, key)) {
     return;
   }
 
@@ -822,85 +808,6 @@ function visibleShortcutElements(selector, root = document) {
   return Array.from(root.querySelectorAll(selector)).filter(isShortcutVisible);
 }
 
-function initializeTableScrollControls(root = document) {
-  const wraps = Array.from(root.querySelectorAll(".table-wrap"));
-  wraps.forEach((wrap) => {
-    if (wrap.dataset.tableScrollReady !== "true") {
-      wrap.dataset.tableScrollReady = "true";
-      if (!wrap.hasAttribute("tabindex")) wrap.tabIndex = 0;
-      if (!wrap.hasAttribute("role")) wrap.setAttribute("role", "region");
-      if (!wrap.hasAttribute("aria-label")) wrap.setAttribute("aria-label", "Scrollable data table");
-
-      const controls = document.createElement("div");
-      controls.className = "table-scroll-controls";
-      controls.dataset.tableScrollControls = "true";
-      controls.hidden = true;
-      controls.innerHTML = `
-        <span class="table-scroll-hint">Use arrows or Shift + ← / →</span>
-        <button class="table-scroll-button" type="button" data-table-scroll-left aria-label="Scroll table left" title="Scroll table left">‹</button>
-        <button class="table-scroll-button" type="button" data-table-scroll-right aria-label="Scroll table right" title="Scroll table right">›</button>
-      `;
-      wrap.insertBefore(controls, wrap.firstChild);
-
-      wrap.addEventListener("scroll", () => updateTableScrollControls(wrap), { passive: true });
-      wrap.addEventListener("pointerenter", () => {
-        activeTableScroller = wrap;
-      });
-      wrap.addEventListener("focusin", () => {
-        activeTableScroller = wrap;
-      });
-      wrap.addEventListener("focus", () => {
-        activeTableScroller = wrap;
-      });
-    }
-
-    window.requestAnimationFrame(() => updateTableScrollControls(wrap));
-  });
-}
-
-function updateTableScrollControls(wrap) {
-  if (!wrap) return;
-  const controls = wrap.querySelector("[data-table-scroll-controls]");
-  if (!controls) return;
-  const maxScroll = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
-  const canScroll = maxScroll > 4;
-  controls.hidden = !canScroll;
-  wrap.classList.toggle("can-scroll-x", canScroll);
-  if (!canScroll) return;
-
-  const left = controls.querySelector("[data-table-scroll-left]");
-  const right = controls.querySelector("[data-table-scroll-right]");
-  if (left) left.disabled = wrap.scrollLeft <= 2;
-  if (right) right.disabled = wrap.scrollLeft >= maxScroll - 2;
-}
-
-function scrollTableWrap(wrap, direction) {
-  if (!wrap) return false;
-  const maxScroll = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
-  if (maxScroll <= 4) {
-    updateTableScrollControls(wrap);
-    return false;
-  }
-  activeTableScroller = wrap;
-  const amount = Math.max(280, Math.round(wrap.clientWidth * 0.72));
-  wrap.scrollBy({ left: amount * direction, behavior: "smooth" });
-  window.setTimeout(() => updateTableScrollControls(wrap), 220);
-  return true;
-}
-
-function handleTableArrowShortcut(event, key) {
-  if (event.altKey || event.ctrlKey || event.metaKey) return false;
-  if (isEditableShortcutTarget(event.target)) return false;
-  const focusedWrap = event.target.closest?.(".table-wrap");
-  const wrap = focusedWrap || (event.shiftKey ? activeTableScroller : null);
-  if (!wrap || !wrap.classList.contains("can-scroll-x")) return false;
-  const plainArrowAllowed = Boolean(focusedWrap || wrap.contains(document.activeElement));
-  if (!event.shiftKey && !plainArrowAllowed) return false;
-  event.preventDefault();
-  scrollTableWrap(wrap, key === "arrowright" ? 1 : -1);
-  return true;
-}
-
 function navigateBack() {
   const button = document.querySelector("[data-back-button]");
   const fallback = button?.dataset.backFallback || "/";
@@ -990,10 +897,7 @@ function triggerActionShortcut(patterns, successMessage, missingMessage, selecte
 }
 
 function findActionByLabel(root, patterns) {
-  const candidates = Array.from(root.querySelectorAll("a, button")).filter(
-    (element) => isShortcutVisible(element) || element.closest("[data-action-menu]")
-  );
-  return candidates.find((element) => {
+  return visibleShortcutElements("a, button", root).find((element) => {
     if (element.disabled || element.closest("[data-shortcut-help], [data-back-button], [data-theme-toggle]")) return false;
     const label = normalizeSearchText(
       [
@@ -1309,32 +1213,7 @@ function showShortcutHint(message) {
   shortcutToastTimer = window.setTimeout(() => toast.remove(), 1800);
 }
 
-function closeActionMenus(exceptMenu = null) {
-  let closed = false;
-  document.querySelectorAll("[data-action-menu].is-open").forEach((menu) => {
-    if (menu === exceptMenu) return;
-    menu.classList.remove("is-open");
-    menu.querySelector("[data-action-menu-toggle]")?.setAttribute("aria-expanded", "false");
-    closed = true;
-  });
-  return closed;
-}
-
 document.addEventListener("click", (event) => {
-  const actionToggle = event.target.closest("[data-action-menu-toggle]");
-  if (actionToggle) {
-    event.preventDefault();
-    const menu = actionToggle.closest("[data-action-menu]");
-    const shouldOpen = !menu.classList.contains("is-open");
-    closeActionMenus(menu);
-    menu.classList.toggle("is-open", shouldOpen);
-    actionToggle.setAttribute("aria-expanded", String(shouldOpen));
-    return;
-  }
-  if (!event.target.closest("[data-action-menu]")) {
-    closeActionMenus();
-  }
-
   const back = event.target.closest("[data-back-button]");
   if (back) {
     event.preventDefault();
@@ -1352,21 +1231,6 @@ document.addEventListener("click", (event) => {
   }
 });
 
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && closeActionMenus()) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  }
-});
-
-window.addEventListener(
-  "resize",
-  () => {
-    document.querySelectorAll(".table-wrap").forEach(updateTableScrollControls);
-  },
-  { passive: true }
-);
-
 renderAppIcons();
 initializeThemeControls();
 initializeSidebarControls();
@@ -1376,7 +1240,6 @@ initializeDashboardVisuals();
 initializeCounters();
 initializeRipples();
 initializeSelectableRows();
-initializeTableScrollControls();
 initializeKeyboardShortcuts();
 consumeShortcutIntent();
 
@@ -1745,7 +1608,6 @@ document.querySelectorAll("form").forEach(updateDocumentTotal);
 initializeItemPickers();
 document.querySelectorAll("[data-live-search]").forEach(applyLiveSearch);
 initializeSelectableRows();
-initializeTableScrollControls();
 
 function initializeSelectableRows(root = document) {
   const tables = Array.from(root.querySelectorAll(".table-wrap table, table[data-selectable-rows]"));

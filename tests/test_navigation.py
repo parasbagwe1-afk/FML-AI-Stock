@@ -139,6 +139,21 @@ def test_company_specific_login_page_has_enterprise_auth_controls(client, app):
     assert "Back to company selection" in html
 
 
+def test_company_specific_login_page_posts_without_method_error(client, app):
+    with app.app_context():
+        aditya_id = Company.query.filter_by(code="AI").one().id
+
+    response = client.post(
+        f"/login/company/{aditya_id}",
+        data={"company_id": aditya_id, "email": "adityainternational.user", "password": "Aditya2026"},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Method Not Allowed" not in response.data
+    assert b"Aditya International" in response.data
+
+
 def test_company_login_rejects_wrong_company_selection(client, app):
     with app.app_context():
         firsttech_id = Company.query.filter_by(code="FML").one().id

@@ -67,7 +67,7 @@
               <a class="secondary-button center-button" href="{{ url_for('auth.admin_login') }}">Owner/admin login</a>
             </div>
           {% else %}
-            <form class="login-card auth-login-card" method="post" data-auth-form>
+            <form class="login-card auth-login-card" method="post" action="{{ url_for('auth.login', next=request.args.get('next')) if request.args.get('next') else url_for('auth.login') }}" data-auth-form>
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="company_id" value="{{ selected_company.id }}">
 

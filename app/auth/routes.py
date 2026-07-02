@@ -153,10 +153,12 @@ def login():
     return render_login(selected_company_id=request.args.get("company_id"))
 
 
-@bp.route("/login/company/<int:company_id>", methods=["GET"])
+@bp.route("/login/company/<int:company_id>", methods=["GET", "POST"])
 def company_login(company_id):
     if current_user.is_authenticated:
         return redirect(url_for("dashboard.index"))
+    if request.method == "POST":
+        return login()
     return render_login(selected_company_id=company_id)
 
 

@@ -167,11 +167,15 @@ const APP_ICON_PATHS = {
   "building-2": '<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18"/><path d="M6 12H4a2 2 0 0 0-2 2v8"/><path d="M18 9h2a2 2 0 0 1 2 2v11"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/>',
   "chart-no-axes-combined": '<path d="M12 16v5"/><path d="M16 14v7"/><path d="M20 10v11"/><path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.708 0L2 15"/><path d="M4 18v3"/><path d="M8 14v7"/>',
   "circle": '<circle cx="12" cy="12" r="9"/>',
+  "calculator": '<rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M8 10h.01"/><path d="M12 10h.01"/><path d="M16 10h.01"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/>',
+  "calendar-days": '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>',
   "credit-card": '<rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/>',
   "folder-open": '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6A2 2 0 0 1 18.46 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4.9a2 2 0 0 1 1.69.93l1.15 1.82H20a2 2 0 0 1 2 2v2"/>',
   "gem": '<path d="M6 3h12l4 6-10 12L2 9l4-6Z"/><path d="M11 3 8 9l4 12 4-12-3-6"/><path d="M2 9h20"/>',
+  "headphones": '<path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/>',
   "keyboard": '<path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="14" x="2" y="5" rx="2"/>',
   "layout-dashboard": '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
+  "more-horizontal": '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
   "moon": '<path d="M12 3a6 6 0 0 0 9 7.2A9 9 0 1 1 12 3Z"/>',
   "panel-left": '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
   "pause": '<rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/>',
@@ -662,6 +666,11 @@ function handleKeyboardShortcut(event) {
   }
 
   if (key === "escape") {
+    if (document.querySelector("[data-action-menu].is-open")) {
+      closeActionMenus();
+      event.preventDefault();
+      return;
+    }
     if (closeShortcutHelp()) {
       event.preventDefault();
       return;
@@ -1220,7 +1229,57 @@ function showShortcutHint(message) {
   shortcutToastTimer = window.setTimeout(() => toast.remove(), 1800);
 }
 
+function closeActionMenus(except = null) {
+  document.querySelectorAll("[data-action-menu].is-open").forEach((menu) => {
+    if (menu === except) return;
+    menu.classList.remove("is-open");
+    menu.querySelector("[data-action-menu-toggle]")?.setAttribute("aria-expanded", "false");
+  });
+}
+
+function positionActionMenu(menu) {
+  const toggle = menu?.querySelector("[data-action-menu-toggle]");
+  const list = menu?.querySelector(".action-menu-list");
+  if (!toggle || !list) return;
+  const toggleRect = toggle.getBoundingClientRect();
+  const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+  const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+  const listWidth = Math.min(Math.max(list.offsetWidth || 190, 190), viewportWidth - 24);
+  const listHeight = Math.min(Math.max(list.offsetHeight || 220, 120), viewportHeight - 24);
+  const left = Math.max(12, Math.min(toggleRect.right - listWidth, viewportWidth - listWidth - 12));
+  const preferredTop = toggleRect.bottom + 8;
+  const top = preferredTop + listHeight > viewportHeight - 12
+    ? Math.max(12, toggleRect.top - listHeight - 8)
+    : preferredTop;
+  list.style.setProperty("--action-menu-left", `${left}px`);
+  list.style.setProperty("--action-menu-top", `${top}px`);
+}
+
+function positionOpenActionMenus() {
+  document.querySelectorAll("[data-action-menu].is-open").forEach(positionActionMenu);
+}
+
 document.addEventListener("click", (event) => {
+  const actionToggle = event.target.closest("[data-action-menu-toggle]");
+  if (actionToggle) {
+    event.preventDefault();
+    const menu = actionToggle.closest("[data-action-menu]");
+    const willOpen = !menu?.classList.contains("is-open");
+    closeActionMenus(menu);
+    if (menu && willOpen) {
+      menu.classList.add("is-open");
+      actionToggle.setAttribute("aria-expanded", "true");
+      positionActionMenu(menu);
+    } else {
+      actionToggle.setAttribute("aria-expanded", "false");
+    }
+    return;
+  }
+
+  if (!event.target.closest("[data-action-menu]")) {
+    closeActionMenus();
+  }
+
   const back = event.target.closest("[data-back-button]");
   if (back) {
     event.preventDefault();
@@ -1237,6 +1296,9 @@ document.addEventListener("click", (event) => {
     closeShortcutHelp();
   }
 });
+
+window.addEventListener("resize", () => closeActionMenus());
+window.addEventListener("scroll", positionOpenActionMenus, true);
 
 renderAppIcons();
 initializeThemeControls();

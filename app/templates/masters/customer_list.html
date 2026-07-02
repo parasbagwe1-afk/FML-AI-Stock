@@ -64,8 +64,8 @@
                 <td>{{ customer.city or '' }}</td>
                 <td class="actions">
                   <div class="action-menu" data-action-menu>
-                    <button class="table-action action-menu-toggle" type="button" data-action-menu-toggle aria-haspopup="true" aria-expanded="false">
-                      Actions
+                    <button class="table-action action-menu-toggle icon-only" type="button" data-action-menu-toggle aria-haspopup="true" aria-expanded="false" aria-label="Actions" title="Actions">
+                      <span data-icon="more-horizontal"></span>
                     </button>
                     <div class="action-menu-list" role="menu">
                       <a href="{{ url_for('masters.customer_detail', customer_id=customer.id, company_id=selected_company_id or '') }}" role="menuitem">Transactions</a>
@@ -97,8 +97,8 @@
                 <td></td>
                 <td class="actions">
                   <div class="action-menu" data-action-menu>
-                    <button class="table-action action-menu-toggle" type="button" data-action-menu-toggle aria-haspopup="true" aria-expanded="false">
-                      Actions
+                    <button class="table-action action-menu-toggle icon-only" type="button" data-action-menu-toggle aria-haspopup="true" aria-expanded="false" aria-label="Actions" title="Actions">
+                      <span data-icon="more-horizontal"></span>
                     </button>
                     <div class="action-menu-list" role="menu">
                       <a href="{{ url_for('masters.supplier_transaction_detail', supplier_id=supplier.id, company_id=selected_company_id or '') }}" role="menuitem">Transactions</a>

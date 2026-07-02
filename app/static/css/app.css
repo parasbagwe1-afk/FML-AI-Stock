@@ -4190,3 +4190,303 @@ body.sidebar-collapsed .company-brand-mark {
     border-radius: var(--radius-3);
   }
 }
+
+/* Topbar declutter refinement */
+.topbar {
+  grid-template-columns: 1fr !important;
+  align-items: stretch;
+  gap: var(--space-5);
+  padding: clamp(22px, 2.4vw, 34px);
+}
+
+.topbar-copy {
+  width: 100%;
+  max-width: none;
+}
+
+.topbar-title-row {
+  grid-template-columns: auto minmax(0, 1fr);
+  max-width: 100%;
+}
+
+.topbar h1 {
+  font-size: clamp(2rem, 2.25vw, 2.8rem);
+  line-height: 1.04;
+  overflow-wrap: anywhere;
+}
+
+.topbar p {
+  max-width: min(760px, 100%);
+}
+
+.topbar-actions {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.topbar-actions > * {
+  flex: 0 0 auto;
+}
+
+.topbar .global-search {
+  flex: 1 1 340px;
+  width: auto;
+  min-width: min(280px, 100%);
+  max-width: 520px;
+}
+
+.quick-actions {
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+}
+
+.topbar .company-chip {
+  flex: 0 1 320px;
+  width: auto;
+  max-width: min(320px, 100%);
+  min-width: 0;
+}
+
+.topbar .company-chip span,
+.topbar .user-chip {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar .user-chip {
+  flex: 0 1 220px;
+  max-width: 240px;
+}
+
+.topbar .bell-button,
+.topbar .theme-toggle {
+  flex: 0 0 44px;
+}
+
+@media (min-width: 1500px) {
+  .topbar {
+    grid-template-columns: minmax(0, 0.95fr) minmax(620px, 1.35fr) !important;
+    align-items: center;
+  }
+
+  .topbar-actions {
+    justify-content: flex-end;
+  }
+
+  .topbar .global-search {
+    flex-basis: 320px;
+  }
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    padding: var(--space-4);
+    gap: var(--space-4);
+  }
+
+  .topbar-title-row {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar .global-search,
+  .quick-actions,
+  .topbar .company-chip,
+  .topbar .user-chip {
+    flex-basis: 100%;
+    max-width: 100%;
+  }
+
+  .quick-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .topbar .bell-button,
+  .topbar .theme-toggle {
+    flex: 1 1 64px;
+  }
+}
+
+.app-shell .main,
+.app-shell .topbar,
+.app-shell .hero-panel,
+.app-shell .panel,
+.app-shell .metric-card,
+.app-shell .report-card,
+.app-shell .table-wrap {
+  opacity: 1;
+}
+
+.app-shell .main {
+  animation: none;
+}
+
+.app-shell .hero-panel,
+.app-shell .panel,
+.app-shell .metric-card,
+.app-shell .report-card,
+.app-shell .table-wrap {
+  animation: none;
+}
+
+/* Functional table action menus */
+.action-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.action-menu-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+
+.action-menu-toggle::after {
+  content: "";
+  display: inline-block;
+  width: 0.48em;
+  height: 0.48em;
+  margin-left: 0.55em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-0.16em) rotate(45deg);
+  transition: transform 160ms ease;
+}
+
+.action-menu.is-open .action-menu-toggle::after {
+  transform: translateY(0.1em) rotate(225deg);
+}
+
+.action-menu-list {
+  position: fixed;
+  top: var(--action-menu-top, 0);
+  left: var(--action-menu-left, 0);
+  z-index: 180;
+  display: none;
+  min-width: 190px;
+  max-width: min(260px, calc(100vw - 24px));
+  padding: 8px;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 24px 64px rgba(17, 24, 39, 0.18);
+}
+
+.action-menu.is-open .action-menu-list {
+  display: grid;
+  gap: 4px;
+}
+
+.action-menu-list a,
+.action-menu-list button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 38px;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 820;
+  text-align: left;
+  cursor: pointer;
+}
+
+.action-menu-list a:hover,
+.action-menu-list a:focus-visible,
+.action-menu-list button:hover,
+.action-menu-list button:focus-visible {
+  background: rgba(182, 141, 45, 0.12);
+  color: var(--primary-gold);
+  outline: none;
+}
+
+.action-menu-list form {
+  margin: 0;
+}
+
+html[data-theme="dark"] .action-menu-list {
+  border-color: rgba(246, 217, 138, 0.18);
+  background: #090909;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.72);
+}
+
+.panel:has(.action-menu),
+.report-card:has(.action-menu),
+.table-wrap:has(.action-menu) {
+  transform: none !important;
+}
+
+/* Compact icon controls */
+.icon-only {
+  aspect-ratio: 1;
+  padding: 0;
+}
+
+.table-action.icon-only,
+.action-menu-toggle.icon-only {
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  min-height: 38px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 14px;
+}
+
+.action-menu-toggle.icon-only::after {
+  content: none;
+}
+
+.action-menu-toggle.icon-only .app-icon {
+  width: 19px;
+  height: 19px;
+}
+
+.floating-tool-actions {
+  gap: 5px;
+  padding: 5px;
+  border-radius: 999px;
+}
+
+.floating-tool-button.icon-only {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.floating-tool-button.icon-only .app-icon {
+  width: 19px;
+  height: 19px;
+}
+
+@media (max-width: 760px) {
+  .floating-tools {
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .floating-tool-button.icon-only {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+  }
+}
